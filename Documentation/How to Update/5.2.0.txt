@@ -1,0 +1,23 @@
+How to update from phpSearch v5.1.0 to v5.2.0
+----------------------------------------------------------------------------
+---------------------------------- FTP -------------------------------------
+Upload and replace the following files on your server:
+
+/app/controllers/admin.php
+/app/controllers/info.php
+/app/includes/info.php
+
+/public/themes/search/assets/js/functions.js
+/public/themes/search/assets/js/jquery.js
+/public/themes/search/views/web/ia/stopwatch.php
+/public/themes/search/views/web/ia/user_date.php
+/public/themes/search/views/web/ia/user_screen_resolution.php
+/public/themes/search/views/info.php
+
+----------------------------------------------------------------------------
+------------------------------- CHANGELOG ----------------------------------
+- Improved the codebase (javascript now runs in strict mode)
+- Updated all the dependencies to their latest versions
+- Fixed page URL validation not working when editing a page
+- Fixed hidden Pages showing up under the Pages menu
+- Other minor improvements

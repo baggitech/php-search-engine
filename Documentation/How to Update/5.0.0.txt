@@ -1,0 +1,37 @@
+How to update from phpSearch v4.3.0 to v5.0.0
+----------------------------------------------------------------------------
+--------------------------------- MySQL ------------------------------------
+INSERT INTO `settings` (`name`, `value`) VALUES ('cookie_policy_url', '')
+
+----------------------------------------------------------------------------
+---------------------------------- FTP -------------------------------------
+Upload and replace the following files on your server:
+
+/app/core/Controller.php
+/app/controllers/admin.php
+/app/controllers/web.php
+/app/includes/info.php
+/app/languages/english.php
+/app/libraries/Search.php
+/app/models/Admin.php
+/app/vendor/* (all files)
+
+/public/themes/search/assets/css/style.css
+/public/themes/search/assets/js/functions.js
+/public/themes/search/views/admin/dashboard.php
+/public/themes/search/views/admin/general.php
+/public/themes/search/views/admin/license.php
+/public/themes/search/views/shared/header.php
+/public/themes/search/views/web/ia/uuid.php
+/public/themes/search/info.php
+
+Or do a clean install.
+
+----------------------------------------------------------------------------
+------------------------------- CHANGELOG ----------------------------------
+- Added Cookie Law banner notification option
+- Added new Instant Answer (camelCase): "camelcase lorem ipsum"
+- Added new Instant Answer (random UUID generator): "uuid", "guid"
+- Added Guzzle as the HTTP client
+- Improved support for PHP 7.4+
+- Other minor improvements

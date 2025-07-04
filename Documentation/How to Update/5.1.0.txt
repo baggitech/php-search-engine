@@ -1,0 +1,11 @@
+How to update from phpSearch v5.0.0 to v5.1.0
+----------------------------------------------------------------------------
+---------------------------------- FTP -------------------------------------
+Upload and replace the following files on your server:
+
+/app/includes/info.php
+/app/libraries/Search.php
+
+----------------------------------------------------------------------------
+------------------------------- CHANGELOG ----------------------------------
+- Updated the Bing API endpoint to the new version
