@@ -2,13 +2,16 @@
 
 namespace Fir\Models;
 
+/**
+ * Classe SuggestionsLimit controla o limite de sugestões por IP
+ */
 class SuggestionsLimit extends Model {
 
     /**
-     * Get all the IP information
+     * Obtém as informações de sugestões de um IP
      *
-     * @param   array   $params
-     * @return  array
+     * @param array $params Parâmetros contendo o IP
+     * @return array Dados do IP (ip, count, updated_at)
      */
     public function getIp($params) {
         $query = $this->db->prepare("SELECT * FROM `suggestions_limit` WHERE `ip` = ?");
@@ -16,22 +19,20 @@ class SuggestionsLimit extends Model {
         $query->execute();
         $result = $query->get_result();
         $query->close();
-
         $data = [];
-
+        // Monta array com os dados retornados do banco
         while($row = $result->fetch_assoc()) {
             $data['ip']         = $row['ip'];
             $data['count']      = $row['count'];
             $data['updated_at'] = $row['updated_at'];
         }
-
         return $data;
     }
 
     /**
-     * Add or update the user's IP status
+     * Adiciona ou atualiza o status do IP do usuário para sugestões
      *
-     * @param   array   $params
+     * @param array $params Parâmetros contendo o IP e o novo count
      */
     public function addIp($params) {
         $query = $this->db->prepare("INSERT INTO `suggestions_limit` (`ip`, `count`) VALUES(?, 1) ON DUPLICATE KEY UPDATE `ip` = VALUES(`ip`), `count` = ?, `updated_at` = `updated_at`");
@@ -41,9 +42,9 @@ class SuggestionsLimit extends Model {
     }
 
     /**
-     * Reset the user's IP count
+     * Reseta o contador de sugestões do IP do usuário
      *
-     * @param   array   $params
+     * @param array $params Parâmetros contendo o IP
      */
     public function resetIp($params) {
         $query = $this->db->prepare("UPDATE `suggestions_limit` SET `count` = 1 WHERE `ip` = ?");

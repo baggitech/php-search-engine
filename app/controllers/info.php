@@ -2,6 +2,9 @@
 
 namespace Fir\Controllers;
 
+// Controller responsável pelas páginas institucionais (Sobre, Contato, etc)
+// Exibe informações estáticas e menu de páginas informativas
+
 class Info extends Controller {
 
     /**

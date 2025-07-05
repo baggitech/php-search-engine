@@ -1,9 +1,9 @@
 <?php
 // Theme Name
-$name = 'phpSearch';
+$name = 'search';
 
 // Theme Author
-$author = 'phpSearch';
+$author = 'Lázaro Baggi (Baggitech) - baggitech@gmail.com';
 
 // Theme URL
 $url = 'https://phpsearch.com/';

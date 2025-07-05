@@ -4,6 +4,9 @@ namespace Fir\Controllers;
 
 use Fir\Libraries\Search;
 
+// Controller responsável por requisições AJAX e sugestões de busca
+// Fornece sugestões de autocomplete e processa requisições auxiliares
+
 class Requests extends Controller {
 
     /**

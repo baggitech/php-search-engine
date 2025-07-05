@@ -1,8 +1,20 @@
 <?php
 defined('FIR') OR exit();
 /**
- * The main template file
- * This file puts together the three main section of the software, header, content and footer
+ * Arquivo de template principal
+ * 
+ * Este arquivo monta as três seções principais do software:
+ * - Header (cabeçalho)
+ * - Content (conteúdo)
+ * - Footer (rodapé)
+ * 
+ * Funcionalidades:
+ * - Define a estrutura HTML base
+ * - Aplica tema claro/escuro baseado nas preferências do usuário
+ * - Carrega CSS e JavaScript necessários
+ * - Aplica fundos de tela aleatórios (se habilitado)
+ * - Define direção do texto (LTR/RTL) baseado no idioma
+ * - Inclui código de rastreamento (se configurado)
  */
 ?>
 <!DOCTYPE html>

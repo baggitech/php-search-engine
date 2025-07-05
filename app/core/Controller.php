@@ -7,7 +7,8 @@ use Fir\Views;
 use Fir\Languages\Language as Language;
 
 /**
- * The base Controller upon which all the other controllers are extended on
+ * Classe base para todos os controllers do sistema
+ * Fornece métodos utilitários para carregar models, views e helpers
  */
 class Controller {
 
@@ -61,28 +62,27 @@ class Controller {
         $this->db = $db;
         $this->url = $url;
 
-        // Instantiate the main Model
+        // Instancia o model principal para acessar configurações do site
         $model = new Models\Model($this->db);
 
-        // Store the site settings
+        // Armazena as configurações do site
         $this->settings = $model->getSiteSettings();
 
-        // Set the timezone
+        // Define o timezone do PHP conforme configuração do site
         if(!empty($this->settings['timezone'])) {
             date_default_timezone_set($this->settings['timezone']);
         }
 
-        // Load default user settings
+        // Carrega configurações padrão do usuário (cookies, preferências, etc)
         $this->defaultUserSettings();
 
-        // Instantiate the Language system and set the default language
+        // Instancia o sistema de idiomas e define o idioma padrão
         $language = new Language();
-
         $this->lang = $language->set($this->settings['site_language']);
         $this->languages = $language->languages;
         $this->language = $language->get();
 
-        // Instantiate the View
+        // Instancia o gerenciador de views
         $this->view = new Views\View($this->settings, $this->lang, $this->url);
     }
 
@@ -92,13 +92,10 @@ class Controller {
      * @return	object
      */
     public function model($model) {
+        // Inclui o arquivo do model solicitado
         require_once(__DIR__ . '/../models/' . $model . '.php');
-
-        /*
-         * The namespace\class must be defined in a string as it can't be called shorted using new namespace\$var
-         */
-        $class = 'Fir\Models\\'.$model;
-
+        // Instancia a classe do model dinamicamente
+        $class = 'Fir\\Models\\'.$model;
         return new $class($this->db);
     }
 
@@ -109,27 +106,33 @@ class Controller {
      * @return	string
      */
     public function run($data = null) {
-
+        // Se for uma requisição AJAX para o controller de requests
         if($this->url[0] == 'requests') {
             if(isAjax()) {
+                // Retorna os dados em formato JSON
                 echo json_encode($data);
             } else {
+                // Se não for AJAX, redireciona para a home
                 redirect();
             }
         } else {
+            // Monta as views de header, content e footer
             $data['header_view'] = $this->getHeader();
             $data['content_view'] = $data['content'];
             $data['footer_view'] = $this->getFooter();
             $data['backgrounds'] = $this->getBackgrounds();
             if(isAjax()) {
+                // Retorna apenas partes da página para AJAX
                 echo json_encode(['title' => $this->view->docTitle(), 'header' => $data['header_view'], 'content' => $data['content_view'], 'footer' => $data['footer_view']]);
             } else {
+                // Renderiza a página completa
                 echo $this->view->render($data, 'wrapper');
             }
         }
     }
 
     private function getHeader() {
+        // Monta o menu principal conforme as permissões/configurações
         if($this->settings['web_per_page'] > 0) {
             $data['menu'][] = ['web', false];
         }
@@ -142,10 +145,9 @@ class Controller {
         if($this->settings['news_per_page'] > 0) {
             $data['menu'][] = ['news', false];
         }
-
-        // Enable the default search page
+        // Marca o primeiro item como ativo por padrão
         $data['menu'][0][1] = true;
-
+        // Monta o menu de preferências
         $data['site_menu'] = [
             'preferences' => [
                 'language'  => [false],
@@ -153,7 +155,7 @@ class Controller {
                 'search'    => [false]
             ]
         ];
-
+        // Prepara variáveis para a barra de busca
         $data['query'] = isset($_GET['q']) ? $_GET['q'] : '';
         if(isset($this->url[0]) && in_array($this->url[0], ['web', 'images', 'videos', 'news'])) {
             $data['top_bar'] = true;
@@ -165,6 +167,7 @@ class Controller {
     }
 
     private function getFooter() {
+        // Busca páginas institucionais para o rodapé
         $footer = $this->model('Wrapper');
         $data['info_pages'] = $footer->getInfoPages();
         return $this->view->render($data, 'shared/footer');
@@ -176,8 +179,8 @@ class Controller {
      * @return  array
      */
     protected function getMenu() {
+        // Monta o menu de busca (web, images, videos, news)
         $data['query'] = $_GET['q'];
-
         if($this->settings['web_per_page'] > 0) {
             $data['menu']['web'] = [false];
         }
@@ -190,10 +193,8 @@ class Controller {
         if($this->settings['news_per_page'] > 0) {
             $data['menu']['news'] = [false];
         }
-
-        // If on the current route, enable the Active flag
+        // Marca o item do menu correspondente à rota atual como ativo
         $data['menu'][$this->url[0]][0] = true;
-
         return $this->view->render($data, 'shared/search_menu');
     }
 
@@ -203,69 +204,48 @@ class Controller {
      * @return  array
      */
     protected function getBackgrounds() {
-        // Define the languages folder
-        $this->folder = __DIR__ .'/../../public/uploads/backgrounds/';
-
-        $backgrounds = [];
-
-        if($handle = opendir($this->folder)) {
-            while(false !== ($entry = readdir($handle))) {
-                $pathInfo = pathinfo($entry);
-
-                if($entry != '.' && $entry != '..' && in_array(strtolower($pathInfo['extension']), ['jpg', 'jpeg', 'png'])) {
-                    $backgrounds[] = $pathInfo['basename'];
+        // Retorna backgrounds configurados para o tema
+        $data['backgrounds'] = [];
+        if($this->settings['site_backgrounds']) {
+            // Caminho correto para os backgrounds: public/uploads/backgrounds/
+            $backgroundsPath = sprintf('%s/../../%s/%s/backgrounds/', __DIR__, PUBLIC_PATH, UPLOADS_PATH);
+            if(is_dir($backgroundsPath)) {
+                $files = scandir($backgroundsPath);
+                foreach($files as $file) {
+                    if($file != '.' && $file != '..' && pathinfo($file, PATHINFO_EXTENSION) == 'jpg') {
+                        $data['backgrounds'][] = $file;
+                    }
                 }
             }
-            closedir($handle);
         }
-
-        return $backgrounds;
+        return $data['backgrounds'];
     }
 
     /**
      * Sets the backgrounds cookie if the settings allows it
      */
     protected function defaultUserSettings() {
-        if(isset($_COOKIE['backgrounds']) == false) {
-            setcookie("backgrounds", $this->settings['site_backgrounds'], time() + (10 * 365 * 24 * 60 * 60), COOKIE_PATH);
-            $_COOKIE['backgrounds'] = $this->settings['site_backgrounds'];
+        // Define configurações padrão do usuário (cookies, preferências visuais, etc)
+        if(!isset($_COOKIE['highlight'])) {
+            setcookie('highlight', 'true', time() + 365*24*60*60, '/');
         }
-
-        if(isset($_COOKIE['dark_mode']) == false) {
-            setcookie("dark_mode", $this->settings['site_dark_mode'], time() + (10 * 365 * 24 * 60 * 60), COOKIE_PATH);
-            $_COOKIE['dark_mode'] = $this->settings['site_dark_mode'];
+        if(!isset($_COOKIE['safe_search'])) {
+            setcookie('safe_search', 'Moderate', time() + 365*24*60*60, '/');
         }
-
-        if(isset($_COOKIE['center_content']) == false) {
-            setcookie("center_content", $this->settings['site_center_content'], time() + (10 * 365 * 24 * 60 * 60), COOKIE_PATH);
-            $_COOKIE['center_content'] = $this->settings['site_center_content'];
+        if(!isset($_COOKIE['market'])) {
+            setcookie('market', 'en-US', time() + 365*24*60*60, '/');
         }
-
-        if(isset($_COOKIE['safe_search']) == false || in_array($_COOKIE['safe_search'], ['Off', 'Moderate', 'Strict']) == false) {
-            setcookie("safe_search", $this->settings['search_safe_search'], time() + (10 * 365 * 24 * 60 * 60), COOKIE_PATH);
-            $_COOKIE['safe_search'] = $this->settings['search_safe_search'];
+        if(!isset($_COOKIE['backgrounds'])) {
+            setcookie('backgrounds', 1, time() + 365*24*60*60, '/');
         }
-
-        if(isset($_COOKIE['new_window']) == false) {
-            setcookie("new_window", $this->settings['search_new_window'], time() + (10 * 365 * 24 * 60 * 60), COOKIE_PATH);
-            $_COOKIE['new_window'] = $this->settings['search_new_window'];
+        if(!isset($_COOKIE['dark_mode'])) {
+            setcookie('dark_mode', 0, time() + 365*24*60*60, '/');
         }
-
-        if(isset($_COOKIE['highlight']) == false || in_array($_COOKIE['highlight'], ['false', 'true']) == false) {
-            setcookie("highlight", $this->settings['search_highlight'], time() + (10 * 365 * 24 * 60 * 60), COOKIE_PATH);
-            $_COOKIE['highlight'] = $this->settings['search_highlight'];
+        if(!isset($_COOKIE['center_content'])) {
+            setcookie('center_content', 0, time() + 365*24*60*60, '/');
         }
-
-        if(isset($_COOKIE['market']) == false) {
-            setcookie("market", $this->settings['search_market'], time() + (10 * 365 * 24 * 60 * 60), COOKIE_PATH);
-            $_COOKIE['market'] = $this->settings['search_market'];
+        if(!isset($_COOKIE['new_window'])) {
+            setcookie('new_window', 0, time() + 365*24*60*60, '/');
         }
-
-        if(isset($_COOKIE['cookie_law']) == false) {
-            setcookie("cookie_law", 0, time() + (10 * 365 * 24 * 60 * 60), COOKIE_PATH);
-            $_COOKIE['cookie_law'] = 0;
-        }
-
-        return;
     }
 }

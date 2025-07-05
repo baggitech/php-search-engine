@@ -1,9 +1,25 @@
 <?php
+/**
+ * Arquivo de idioma: English
+ *
+ * @author Lázaro Baggi (Baggitech) - baggitech@gmail.com
+ * @copyright Lázaro Baggi (Baggitech) - Brasil. All rights reserved.
+ * @version 1.0
+ * @link https://baggitech.com.br
+ *
+ * Este arquivo contém todas as traduções de textos exibidos na interface do sistema.
+ * Cada entrada do array $lang utiliza uma chave identificadora e o valor correspondente em inglês.
+ * Para criar um novo idioma, basta copiar este arquivo, traduzir os valores e salvar com o nome do idioma desejado.
+ *
+ * Exemplo de uso no código: $lang['search'] retorna 'Search'.
+ *
+ * Não é necessário alterar as chaves, apenas os valores.
+ */
 // Language Name
 $name = 'English';
 
 // Language Author
-$author = 'phpSearch';
+$author = 'Lázaro Baggi (Baggitech) - baggitech@gmail.com';
 
 // Language URL
 $url = 'https://phpsearch.com';

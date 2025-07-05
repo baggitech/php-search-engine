@@ -1,16 +1,17 @@
 <?php
 
 /**
- * Redirect to an internal route
+ * Redireciona para uma rota interna do sistema
  *
- * @param   string  $path   The internal path to redirect
+ * @param   string  $path   Caminho interno para redirecionamento
  */
 function redirect($path = null) {
+    // Envia o cabeçalho HTTP para redirecionar o navegador para a nova URL
     header('Location: ' . URL_PATH . '/' . $path);
 
     /**
-     * Exit is required in order to stop executing any extra code after the redirect call
-     * It also allows passing on session variables to the redirected page by preventing extra code to be executed
+     * O exit é necessário para interromper a execução de qualquer código após o redirecionamento
+     * Isso também garante que variáveis de sessão sejam passadas corretamente para a página de destino
      */
     exit;
 }

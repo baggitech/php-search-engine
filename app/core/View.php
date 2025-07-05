@@ -3,7 +3,8 @@
 namespace Fir\Views;
 
 /**
- * The view class which generates the views
+ * Classe responsável pelo gerenciamento e renderização das views (templates)
+ * Permite passar dados para as views e renderizar arquivos de template
  */
 class View {
 
@@ -44,23 +45,21 @@ class View {
      * @return	string
      */
     public function render($data = [], $view = null) {
-        // General variables used site-wide
+        // Variáveis globais usadas em todas as views
         $data['settings']       = $this->settings;
         $data['year']           = date('Y');
-        $data['url'] 		    = URL_PATH;
+        $data['url']            = URL_PATH;
         $data['theme_path']     = THEME_PATH;
         $data['cookie']         = $_COOKIE;
         $lang = $this->lang;
 
-        /**
-         * Start the output buffer
-         * This is needed to create the template inheritance
-         */
+        // Inicia o buffer de saída para permitir herança de templates
         ob_start();
 
-        // Do not use %_once as some of the template files may need to be called multiple times
+        // Inclui o arquivo da view (template)
         require(sprintf('%s/../../%s/%s/%s/views/%s.php', __DIR__, PUBLIC_PATH, THEME_PATH, $this->settings['site_theme'], $view));
 
+        // Retorna o conteúdo renderizado
         return ob_get_clean();
     }
 
@@ -69,19 +68,16 @@ class View {
      */
     public function message() {
         $messages = null;
-
-        // If a message exists
+        // Se existe mensagem na sessão
         if(isset($_SESSION['message'])) {
-            // Render the message
+            // Renderiza cada mensagem
             foreach($_SESSION['message'] as $key => $value) {
                 $data['message'] = ['type' => $value[0], 'content' => $value[1]];
                 $messages .= $this->render($data, 'shared/message');
             }
         }
-
-        // Remove the message
+        // Remove as mensagens da sessão após exibir
         unset($_SESSION['message']);
-
         return $messages;
     }
 
@@ -89,8 +85,8 @@ class View {
      * @return string
      */
     public function token() {
+        // Renderiza o token CSRF salvo na sessão
         $data['token_id'] = $_SESSION['token_id'];
-
         return $this->render($data, 'shared/token');
     }
 
@@ -98,7 +94,7 @@ class View {
      * @return string
      */
     public function docTitle() {
-        // If the controller/method has additional title information
+        // Monta o título da página (usando metadados se disponíveis)
         if(isset($this->metadata['title'])) {
             $title = implode(' - ', $this->metadata['title']).' - '.$this->settings['site_title'];
         } else {

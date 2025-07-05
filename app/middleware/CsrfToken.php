@@ -5,44 +5,46 @@ namespace Fir\Middleware;
 use Fir\Languages\Language as Language;
 
 /**
- * Class CsrfToken ensures that all POST requested have a valid CSRF Token
+ * Classe CsrfToken garante que todas as requisições POST tenham um token CSRF válido
  */
 class CsrfToken {
 
+    /**
+     * Construtor: gera e valida o token CSRF
+     */
     public function __construct() {
         $this->generateToken();
         $this->validateToken();
     }
 
     /**
-     * Validate the CSRF token
+     * Valida o token CSRF enviado no formulário
      */
     private function validateToken() {
+        // Se houver dados enviados via POST
         if(isset($_POST) && !empty($_POST)) {
+            // Compara o token enviado com o token salvo na sessão
             if($_POST['token_id'] != $_SESSION['token_id']) {
                 $lang = (new Language())->set();
-
+                // Adiciona mensagem de erro na sessão
                 $_SESSION['message'][] = ['error', $lang['token_mismatch']];
-
-                // Redirect to the requested location
+                // Redireciona para a mesma página
                 header("Location: " . URL_PATH . '/' . $_GET['url']);
-
-                // Prevent anything else from executing on the page
+                // Impede a execução de qualquer outro código
                 exit;
             }
         }
     }
 
     /**
-     * Generate and set a random token to prevent CSRF
+     * Gera e armazena um token aleatório na sessão para proteção CSRF
      */
     private function generateToken() {
-        // If there isn't any sessions set, or if the session is empty
+        // Se não existe token na sessão ou está vazio
         if(!isset($_SESSION['token_id']) || empty($_SESSION['token_id'])) {
-            // Generate a random session token
+            // Gera um token aleatório usando hash sha256
             $token_id = hash('sha256', substr(str_shuffle('0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ'), 0, 10));
-
-            // Store the token in the session
+            // Salva o token na sessão
             $_SESSION['token_id'] = $token_id;
         }
     }

@@ -3,7 +3,8 @@
 namespace Fir;
 
 /**
- * The app router which decides what router and method is selected based on the user's input
+ * Classe principal responsável pelo roteamento e inicialização da aplicação
+ * Interpreta a URL, carrega o controller e executa a ação correspondente
  */
 class App {
     /**
@@ -28,89 +29,91 @@ class App {
      * App constructor.
      */
     public function __construct() {
-        // Create the database connection
+        // Cria a conexão com o banco de dados
         $this->db = (new Connection\Database())->connect();
 
-        // Load dependencies
+        // Carrega dependências do Composer (vendor)
         $this->load(2);
 
-        // Load libraries
+        // Carrega bibliotecas
         $this->load(1);
 
-        // Load helpers
+        // Carrega helpers
         $this->load(0);
 
-        // Instantiate the middleware
+        // Instancia o middleware (executa regras globais antes dos controllers)
         new Middleware\Middleware();
 
-        // Parse the URL
+        // Faz o parsing da URL recebida
         $this->parseUrl();
 
-        // Check if the controller exists
+        // Verifica se o controller solicitado existe
         if(isset($this->url[0])) {
             if(file_exists(__DIR__ . '/../controllers/'. $this->url[0].'.php')) {
-                // Set the controller
+                // Define o controller a ser usado
                 $this->controller = $this->url[0];
             } elseif(!empty($this->url[0])) {
+                // Se não existir, redireciona para a home
                 redirect();
             }
         }
+        // Inclui o arquivo do controller
         require_once(__DIR__ . '/../controllers/'. $this->controller .'.php');
 
-        /**
-         * The namespace\class must be defined in a string as it can't be called shorted using new namespace\$var
-         */
-        $class = 'Fir\Controllers\\'.$this->controller;
-
+        // Instancia a classe do controller
+        $class = 'Fir\\Controllers\\'.$this->controller;
         $this->controller = new $class($this->db, $this->url);
 
-        // Check if a second parameter exists in the URL
-        // If so, check if the method exists
+        // Verifica se há um método específico na URL e se ele existe no controller
         if(isset($this->url[1])) {
             if(method_exists($this->controller, $this->url[1])) {
                 $this->method = $this->url[1];
             }
         }
 
-        // Call the method from the controller and pass the params
+        // Executa o método do controller, passando os parâmetros da URL
         $data = call_user_func_array([$this->controller, $this->method], $this->url);
 
+        // Executa o método run do controller (padrão para renderização)
         $this->controller->run($data);
 
-        // Close the database connection
+        // Fecha a conexão com o banco de dados
         $this->db->close();
     }
 
     /**
-     * Parse and set the GET parameters sent by the user
+     * Faz o parsing e define os parâmetros GET enviados pelo usuário
      */
     public function parseUrl() {
         if(isset($_GET['url'])) {
+            // Quebra a URL em partes separadas por /
             $this->url = explode('/', rtrim($_GET['url'], '/'));
         }
     }
 
     /**
-     * Load the libraries and helpers
+     * Carrega as bibliotecas e helpers
      *
-     * @param	int		$type	0 to load the helpers, 1 to load, instantiate and pass the library to the controller as a property
-     * @return	object
+     * @param   int     $type   0 para helpers, 1 para bibliotecas, 2 para dependências do Composer
+     * @return  object
      */
     private function load($type) {
         if($type == 2) {
+            // Carrega o autoload do Composer
             if(file_exists(__DIR__ . '/../vendor/autoload.php')) {
                 require_once(__DIR__ . '/../vendor/autoload.php');
             }
         } elseif($type == 1) {
-            // Autoload any needed library
+            // Autoload de bibliotecas conforme necessário
             spl_autoload_register(function($class) {
-                // Explode the class namespace and select only the class name
+                // Pega apenas o nome da classe (sem namespace)
                 $className = explode('\\', $class);
                 if(file_exists(__DIR__ . '/../libraries/'.end($className).'.php')) {
                     require_once(__DIR__ . '/../libraries/'.end($className).'.php');
                 }
             });
         } else {
+            // Carrega todos os helpers automaticamente
             if($handle = opendir(__DIR__ . '/../helpers/')) {
                 while(false !== ($entry = readdir($handle))) {
                     if($entry != '.' && $entry != '..' && substr($entry, -4, 4) == '.php') {

@@ -14,7 +14,7 @@ defined('FIR') OR exit();
             <div class="list-col-button"><button type="submit" name="theme" value="<?=$theme['path']?>"<?=($data['settings']['site_theme'] == $theme['path'] ? ' disabled' : '')?>><?=($data['settings']['site_theme'] == $theme['path'] ? $lang['active'] : $lang['activate'])?></button></div>
             <div class="list-col-content">
                 <div><strong><a href="<?=$theme['url']?>" target="_blank" data-nd><?=$theme['name']?></a></strong> <?=$theme['version']?></div>
-                <div><?=$lang['by']?>: <a href="<?=$theme['url']?>" target="_blank" data-nd><?=$theme['author']?></a></div>
+                <div><?=$lang['by']?>: <a href="<?=$theme['url']?>" target="_blank" data-nd><?=$theme['author'] ?? 'Lázaro Baggi (Baggitech) - baggitech@gmail.com'?></a></div>
             </div>
         </div>
         <?php endforeach ?>

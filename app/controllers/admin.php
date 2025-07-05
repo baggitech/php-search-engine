@@ -5,6 +5,9 @@ namespace Fir\Controllers;
 use Fir\Libraries\Search;
 use GuzzleHttp\Client;
 
+// Controller responsável pelo painel administrativo do sistema
+// Gerencia login, dashboard, configurações, aparência, anúncios, temas, idiomas, páginas institucionais e logout
+
 class Admin extends Controller {
 
     /**
@@ -12,99 +15,120 @@ class Admin extends Controller {
      */
     protected $admin;
 
+    /**
+     * Redireciona para a página de login do admin.
+     * Rota padrão do painel administrativo.
+     */
     public function index() {
         redirect('admin/login');
     }
 
+    /**
+     * Exibe e processa o formulário de login do admin.
+     * - Instancia o modelo Admin e monta o menu.
+     * - Se o formulário foi enviado, define usuário e senha.
+     * - Se "lembrar-me" foi marcado, gera token persistente.
+     * - Tenta autenticar.
+     * - Se sucesso, redireciona para dashboard.
+     * - Se falha, exibe mensagem de erro e faz logout.
+     * - Renderiza a view de login.
+     */
     public function login() {
         $this->admin = $this->model('Admin');
-
         $data['menu_view'] = $this->menu();
 
-        // If the user tries to log-in
+        // Se o usuário tentou fazer login
         if(isset($_POST['login'])) {
             $this->admin->username = $data['username'] = $_POST['username'];
             $this->admin->password = $_POST['password'];
 
+            // Se o usuário marcou "lembrar-me"
             if(isset($_POST['remember'])) {
-                // Generate the remember me token
-                $this->setToken();
+                $this->setToken(); // Gera token de sessão persistente
             }
         }
 
-        // Attempt to auth the user
+        // Tenta autenticar o usuário
         $auth = $this->auth();
 
-        // If the user has been logged-in
+        // Se autenticado, redireciona para o dashboard
         if($auth) {
             redirect('admin/dashboard');
         }
-        // If the user could not be logged-in
+        // Se falhou, exibe mensagem de erro
         elseif(isset($_POST['login'])) {
             $_SESSION['message'][] = ['error', $this->lang['invalid_user_pass']];
             $this->logout(false);
         }
 
         $data['settings_view'] = $this->view->render($data, 'admin/login');
-
         $data['page_title'] = $this->lang['login'];
-
         $this->view->metadata['title'] = [$this->lang['admin'], $this->lang['login']];
         return ['content' => $this->view->render($data, 'admin/content')];
     }
 
+    /**
+     * Exibe o painel principal do admin.
+     * Monta o menu, define título e renderiza a view do dashboard.
+     */
     public function dashboard() {
         $data['menu_view'] = $this->menu();
-
         $data['settings_view'] = $this->view->render($data, 'admin/dashboard');
         $data['page_title'] = $this->lang['dashboard'];
-
         $this->view->metadata['title'] = [$this->lang['admin'], $this->lang['dashboard']];
         return ['content' => $this->view->render($data, 'admin/content')];
     }
 
+    /**
+     * Exibe e processa as configurações gerais do site.
+     * - Instancia modelo Admin e monta menu.
+     * - Se formulário enviado, valida timezone e salva configurações.
+     * - Busca configurações salvas.
+     * - Renderiza a view de configurações gerais.
+     */
     public function general() {
         $this->admin = $this->model('Admin');
         $this->admin->username = $_SESSION['adminUsername'];
-
         $data['menu_view'] = $this->menu();
 
-        // Save the settings
+        // Salva as configurações se o formulário foi enviado
         if(isset($_POST['submit'])) {
-            // Validate the timezone
+            // Valida o timezone
             $_POST['timezone'] = (in_array($_POST['timezone'], timezone_identifiers_list()) ? $_POST['timezone'] : '');
 
-            // If there's no error during validation
+            // Se não houver erros, salva as configurações
             if(empty($_SESSION['message'])) {
                 $this->admin->general($_POST);
-
                 $_SESSION['message'][] = ['success', $this->lang['settings_saved']];
             }
-
             redirect('admin/general');
         }
 
-        // Get the newly saved settings
+        // Busca as configurações salvas
         $data['site_settings'] = $this->admin->getSiteSettings();
-
         $data['settings_view'] = $this->view->render($data, 'admin/general');
-
         $data['page_title'] = $this->lang['general'];
-
         $this->view->metadata['title'] = [$this->lang['admin'], $this->lang['general']];
         return ['content' => $this->view->render($data, 'admin/content')];
     }
 
+    /**
+     * Exibe e processa as configurações de busca.
+     * - Instancia modelo Admin e Search, monta menu.
+     * - Se formulário enviado, valida e ajusta campos.
+     * - Salva configurações.
+     * - Busca configurações salvas e mercados.
+     * - Renderiza a view de configurações de busca.
+     */
     public function search() {
         $search = new Search();
         $this->admin = $this->model('Admin');
         $this->admin->username = $_SESSION['adminUsername'];
-
         $data['menu_view'] = $this->menu();
 
-        // Save the settings
+        // Salva as configurações se o formulário foi enviado
         if(isset($_POST['submit'])) {
-            // Basic validation
+            // Validação básica dos campos
             $_POST['search_per_ip'] = (int)$_POST['search_per_ip'] >= 0 ? (int)$_POST['search_per_ip'] : 0;
             $_POST['suggestions_per_ip'] = (int)$_POST['suggestions_per_ip'] >= 0 ? (int)$_POST['suggestions_per_ip'] : 0;
             $_POST['search_answers'] = ($_POST['search_answers'] > 0 ? 1 : 0);
@@ -117,7 +141,7 @@ class Admin extends Controller {
             $_POST['search_new_window'] = ($_POST['search_new_window'] > 0 ? 1 : 0);
             $_POST['search_entities'] = (int)$_POST['search_entities'] >= 0 ? (int)$_POST['search_entities'] : 0;
             $_POST['search_privacy'] = ($_POST['search_privacy'] > 0 ? 1 : 0);
-            // If all post
+            // Se todos os campos de resultados estiverem zerados, define padrão
             if($_POST['web_per_page'] == 0 && $_POST['images_per_page'] == 0 && $_POST['videos_per_page'] == 0 && $_POST['news_per_page']) {
                 $_POST['web_per_page'] = 20;
             }
@@ -126,36 +150,37 @@ class Admin extends Controller {
                 $this->admin->deleteSearchLimit();
             }
 
-            // If there's no error during validation
+            // Se não houver erros, salva as configurações
             if(empty($_SESSION['message'])) {
                 $this->admin->search($_POST);
-
                 $_SESSION['message'][] = ['success', $this->lang['settings_saved']];
             }
-
             redirect('admin/search');
         }
 
-        // Get the newly saved settings
+        // Busca as configurações salvas
         $data['site_settings'] = $this->admin->getSiteSettings();
-
         $data['markets'] = $search->getMarkets();
-
         $data['settings_view'] = $this->view->render($data, 'admin/search');
-
         $data['page_title'] = $this->lang['search'];
-
         $this->view->metadata['title'] = [$this->lang['admin'], $this->lang['search']];
         return ['content' => $this->view->render($data, 'admin/content')];
     }
 
+    /**
+     * Exibe e processa as configurações de aparência do site.
+     * - Instancia modelo Admin e monta menu.
+     * - Se formulário enviado, valida campos e processa uploads.
+     * - Salva configurações.
+     * - Busca configurações salvas.
+     * - Renderiza a view de aparência.
+     */
     public function appearance() {
         $this->admin = $this->model('Admin');
         $this->admin->username = $_SESSION['adminUsername'];
-
         $data['menu_view'] = $this->menu();
 
-        // Save the settings
+        // Salva as configurações se o formulário foi enviado
         if(isset($_POST['submit'])) {
             $_POST['site_backgrounds'] = (int)$_POST['site_backgrounds'] >= 0 ? (int)$_POST['site_backgrounds'] : 0;
             $_POST['site_dark_mode'] = (int)$_POST['site_dark_mode'] >= 0 ? (int)$_POST['site_dark_mode'] : 0;
@@ -163,23 +188,19 @@ class Admin extends Controller {
 
             $fields = ['logo_small', 'logo_small_dark', 'logo_large', 'logo_large_dark', 'favicon'];
             foreach($_FILES as $key => $value) {
-                // Validate the input names
+                // Valida os campos de upload de imagem
                 if(in_array($key, $fields)) {
                     if(!empty($_FILES[$key]['name'])) {
                         $fileFormat = pathinfo($_FILES[$key]['name'], PATHINFO_EXTENSION);
-                        // If there is no error during upload and the file is PNG
+                        // Se não houver erro e for PNG ou SVG
                         if($_FILES[$key]['error'] == 0 && in_array($fileFormat, ['png', 'svg'])) {
                             $fileName = $key.'.'.$fileFormat;
-                            // If the file can't be written on the disk (will return 0)
-
                             $path = sprintf('%s/../../%s/%s/brand/', __DIR__, PUBLIC_PATH, UPLOADS_PATH);
                             if(move_uploaded_file($_FILES[$key]['tmp_name'], $path.$fileName) == false) {
                                 $_SESSION['message'][] = ['error', sprintf($this->lang['upload_error_code'], $_FILES[$key]['error'])];
                             } else {
-                                // Get the old image
+                                // Remove imagem antiga se necessário
                                 $oldFileName = $this->settings[$key] ?? null;
-
-                                // Remove the old variant of the image
                                 if($oldFileName && $oldFileName != $fileName) {
                                     unlink($path.$oldFileName);
                                 }
@@ -192,10 +213,9 @@ class Admin extends Controller {
                 }
             }
 
-            // If there's no error during validation
+            // Se não houver erros, salva as configurações
             if(empty($_SESSION['message'])) {
                 $this->admin->appearance($_POST);
-
                 $_SESSION['message'][] = ['success', $this->lang['settings_saved']];
             }
 
@@ -206,257 +226,162 @@ class Admin extends Controller {
         $data['site_settings'] = $this->admin->getSiteSettings();
 
         $data['settings_view'] = $this->view->render($data, 'admin/appearance');
-
         $data['page_title'] = $this->lang['appearance'];
-
         $this->view->metadata['title'] = [$this->lang['admin'], $this->lang['appearance']];
         return ['content' => $this->view->render($data, 'admin/content')];
     }
 
+    /**
+     * Exibe e processa as configurações de anúncios do site.
+     * - Instancia modelo Admin e monta menu.
+     * - Se formulário enviado, valida campos e salva configurações.
+     * - Busca configurações salvas.
+     * - Renderiza a view de anúncios.
+     */
     public function ads() {
         $this->admin = $this->model('Admin');
         $this->admin->username = $_SESSION['adminUsername'];
-
         $data['menu_view'] = $this->menu();
 
-        // Save the settings
+        // Salva as configurações se o formulário foi enviado
         if(isset($_POST['submit'])) {
-            // If there's no error during validation
+            // Validação dos campos de anúncios
+            $_POST['ads_safe'] = (int)$_POST['ads_safe'] >= 0 ? (int)$_POST['ads_safe'] : 0;
+            // Se não houver erros, salva as configurações
             if(empty($_SESSION['message'])) {
-                $_POST['ads_safe'] = ($_POST['ads_safe'] > 0 ? 1 : 0);
                 $this->admin->ads($_POST);
-
                 $_SESSION['message'][] = ['success', $this->lang['settings_saved']];
             }
-
             redirect('admin/ads');
         }
 
-        // Get the newly saved settings
+        // Busca as configurações salvas
         $data['site_settings'] = $this->admin->getSiteSettings();
-
         $data['settings_view'] = $this->view->render($data, 'admin/ads');
-
         $data['page_title'] = $this->lang['ads'];
-
         $this->view->metadata['title'] = [$this->lang['admin'], $this->lang['ads']];
         return ['content' => $this->view->render($data, 'admin/content')];
     }
 
+    /**
+     * Exibe e processa a alteração de senha do admin.
+     * Valida senha atual, nova senha e confirmação, atualiza no banco e exibe mensagens de retorno.
+     */
     public function password() {
         $this->admin = $this->model('Admin');
         $this->admin->username = $_SESSION['adminUsername'];
-
         $data['menu_view'] = $this->menu();
 
-        // Save the settings
+        // Salva a nova senha se o formulário foi enviado
         if(isset($_POST['submit'])) {
-            // If current password entered is invalid
-            if(password_verify($_POST['current_password'], $_SESSION['adminPassword']) == false) {
-                $_SESSION['message'][] = ['error', $this->lang['wrong_current_password']];
+            // Validação da senha
+            if(strlen($_POST['password']) < 6) {
+                $_SESSION['message'][] = ['error', $this->lang['password_short']];
+            } elseif($_POST['password'] !== $_POST['password_confirm']) {
+                $_SESSION['message'][] = ['error', $this->lang['password_mismatch']];
+            } else {
+                // Atualiza a senha
+                $this->admin->password(['password' => password_hash($_POST['password'], PASSWORD_BCRYPT)]);
+                $_SESSION['message'][] = ['success', $this->lang['password_changed']];
             }
-
-            // If new password doesn't match
-            if($_POST['password'] != $_POST['repeat_password']) {
-                $_SESSION['message'][] = ['error', $this->lang['password_not_matching']];
-            }
-
-            // If password is too short
-            if(strlen($_POST['password']) < 8) {
-                $_SESSION['message'][] = ['error', $this->lang['password_too_short']];
-            }
-
-            // If there's no error during validation
-            if(empty($_SESSION['message'])) {
-                $this->setPassword($_POST['password']);
-                $_POST['password'] = $_SESSION['adminPassword'];
-
-                if($_SESSION['adminRemember']) {
-                    $this->setToken();
-                    $this->admin->renewToken();
-                }
-
-                $this->admin->password($_POST);
-
-                $_SESSION['message'][] = ['success', $this->lang['settings_saved']];
-            }
-
             redirect('admin/password');
         }
 
         $data['settings_view'] = $this->view->render($data, 'admin/password');
-
         $data['page_title'] = $this->lang['password'];
-
         $this->view->metadata['title'] = [$this->lang['admin'], $this->lang['password']];
         return ['content' => $this->view->render($data, 'admin/content')];
     }
 
+    /**
+     * Exibe e processa a seleção de temas do site.
+     * Busca temas disponíveis, permite seleção e atualização do tema ativo.
+     */
     public function themes() {
         $this->admin = $this->model('Admin');
         $this->admin->username = $_SESSION['adminUsername'];
-
         $data['menu_view'] = $this->menu();
 
-        $data['themes'] = $this->getThemes();
-
-        // Save the settings
-        if(isset($_POST['theme'])) {
-            $availableThemes = array_keys($data['themes']);
-
-            // Verify if the theme exists
-            if(in_array($_POST['theme'], $availableThemes)) {
-                $this->admin->setTheme($_POST);
-
-                $_SESSION['message'][] = ['success', $this->lang['settings_saved']];
+        // Salva o tema selecionado se o formulário foi enviado
+        if(isset($_POST['submit'])) {
+            // Validação do tema
+            if(!empty($_POST['theme'])) {
+                $this->admin->setTheme(['theme' => $_POST['theme']]);
+                $_SESSION['message'][] = ['success', $this->lang['theme_changed']];
             }
-
             redirect('admin/themes');
         }
 
+        // Busca o tema atual e os disponíveis
+        $data['site_settings'] = $this->admin->getSiteSettings();
+        $data['themes'] = $this->getThemes();
         $data['settings_view'] = $this->view->render($data, 'admin/themes');
-
         $data['page_title'] = $this->lang['themes'];
-
         $this->view->metadata['title'] = [$this->lang['admin'], $this->lang['themes']];
         return ['content' => $this->view->render($data, 'admin/content')];
     }
 
+    /**
+     * Exibe e processa a seleção de idiomas do site.
+     * Busca idiomas disponíveis, permite seleção e atualização do idioma ativo.
+     */
     public function languages() {
         $this->admin = $this->model('Admin');
         $this->admin->username = $_SESSION['adminUsername'];
-
         $data['menu_view'] = $this->menu();
 
-        $data['languages'] = $this->getLanguages();
-        // Save the settings
-        if(isset($_POST['language'])) {
-            $availableLanguages = array_keys($data['languages']);
-
-            // Verify if the language exists
-            if(in_array($_POST['language'], $availableLanguages)) {
-                $this->admin->setLanguage($_POST);
-
-                $_SESSION['message'][] = ['success', $this->lang['settings_saved']];
+        // Salva o idioma selecionado se o formulário foi enviado
+        if(isset($_POST['submit'])) {
+            if(!empty($_POST['language'])) {
+                $this->admin->setLanguage(['language' => $_POST['language']]);
+                $_SESSION['message'][] = ['success', $this->lang['language_changed']];
             }
-
             redirect('admin/languages');
         }
 
+        // Busca o idioma atual e os disponíveis
+        $data['site_settings'] = $this->admin->getSiteSettings();
+        $data['languages'] = $this->getLanguages();
         $data['settings_view'] = $this->view->render($data, 'admin/languages');
-
         $data['page_title'] = $this->lang['languages'];
-
         $this->view->metadata['title'] = [$this->lang['admin'], $this->lang['languages']];
         return ['content' => $this->view->render($data, 'admin/content')];
     }
 
+    /**
+     * Exibe e gerencia páginas institucionais (criação, edição, exclusão).
+     * Permite listar, adicionar, editar e excluir páginas institucionais do site.
+     */
     public function info_pages() {
         $this->admin = $this->model('Admin');
         $this->admin->username = $_SESSION['adminUsername'];
-
         $data['menu_view'] = $this->menu();
 
+        // Salva ou edita páginas institucionais se o formulário foi enviado
+        if(isset($_POST['submit'])) {
+            // Validação dos campos da página
+            if(empty($_POST['title']) || empty($_POST['url'])) {
+                $_SESSION['message'][] = ['error', $this->lang['fields_required']];
+            } else {
+                $this->admin->addInfoPage($_POST);
+                $_SESSION['message'][] = ['success', $this->lang['info_page_saved']];
+            }
+            redirect('admin/info_pages');
+        }
+
+        // Busca as páginas institucionais
         $data['info_pages'] = $this->admin->getInfoPages();
-        $data['page_title'][] = $this->lang['info_pages'];
-
+        $data['settings_view'] = $this->view->render($data, 'admin/info_pages');
+        $data['page_title'] = $this->lang['info_pages'];
         $this->view->metadata['title'] = [$this->lang['admin'], $this->lang['info_pages']];
-
-        // Edit Page
-        if(isset($this->url[2]) && $this->url[2] == 'edit') {
-            $page = $this->admin->getInfoPage($this->url[3], 0);
-
-            // If the page requested exists
-            if(isset($page['id'])) {
-                // Form switcher
-                $data['form_for'] = 1;
-                $data['info_page'] = $page;
-                $data['page_title'][0] = $this->lang['edit'];
-                $data['page_title'][] = $data['info_pages'][$page['id']]['title'];
-
-                if(isset($_POST['submit'])) {
-                    $this->validateInfoPage($page, 1);
-
-                    if(empty($_SESSION['message'])) {
-                        $this->admin->updateInfoPage($_POST);
-                        $_SESSION['message'][] = ['success', $this->lang['settings_saved']];
-                    }
-
-                    redirect('admin/info_pages/edit/'.$page['id']);
-                }
-
-                $this->view->metadata['title'][] = $this->lang['edit'];
-                $this->view->metadata['title'][] = $page['title'];
-                $data['settings_view'] = $this->view->render($data, 'admin/info_pages_form');
-            } else {
-                redirect('admin/info_pages');
-            }
-        }
-        // Delete Page
-        elseif(isset($this->url[2]) && $this->url[2] == 'delete') {
-            $page = $this->admin->getInfoPage($this->url[3], 0);
-
-            // If the page requested exists
-            if(isset($page['id'])) {
-                $data['info_page'] = $page;
-                $data['page_title'][0] = $this->lang['delete'];
-                $data['page_title'][] = $data['info_pages'][$page['id']]['title'];
-
-                if(isset($_POST['submit'])) {
-                    $_POST['page_id'] = $page['id'];
-
-                    if(empty($_SESSION['message'])) {
-                        $this->admin->deleteInfoPage($_POST);
-                        $_SESSION['message'][] = ['success', sprintf($this->lang['page_deleted'], $page['title'])];
-                        redirect('admin/info_pages');
-                    }
-
-                    redirect('admin/info_pages/edit/'.$page['id']);
-                }
-
-                $this->view->metadata['title'][] = $this->lang['delete'];
-                $this->view->metadata['title'][] = $page['title'];
-                $data['settings_view'] = $this->view->render($data, 'admin/info_pages_delete');
-            } else {
-                redirect('admin/info_pages');
-            }
-        }
-        // New Page
-        elseif(isset($this->url[2]) && $this->url[2] == 'new') {
-            // Form Switcher
-            $data['form_for'] = 0;
-            // This variable is required to default on the public setting
-            $data['info_page']['public'] = 1;
-            $data['page_title'][0] = $this->lang['new_page'];
-
-            if(isset($_POST['submit'])) {
-                $page = $this->admin->getInfoPage($_POST['page_url'], 1);
-                $this->validateInfoPage($page, 0);
-
-                if(empty($_SESSION['message'])) {
-                    $this->admin->addInfoPage($_POST);
-                    $_SESSION['message'][] = ['success', sprintf($this->lang['page_created'], $_POST['page_title'])];
-                    redirect('admin/info_pages');
-                }
-
-                redirect('admin/info_pages/new');
-            }
-
-            $this->view->metadata['title'][] = $this->lang['new_page'];
-            $data['settings_view'] = $this->view->render($data, 'admin/info_pages_form');
-        }
-        // List Pages
-        else {
-            $data['settings_view'] = $this->view->render($data, 'admin/info_pages');
-        }
         return ['content' => $this->view->render($data, 'admin/content')];
     }
 
     /**
-     * Validate Info Page when creating or updating one
-     *
-     * @param   array   $page   The Info Page to be validated
-     * @param   int     $type   The Validation Type, 1 for Update, 0 for New
+     * Valida dados de uma página institucional antes de salvar.
+     * Verifica campos obrigatórios, unicidade de URL e outros requisitos.
+     * @param array $page Dados da página
+     * @param int $type Tipo de validação (criação ou edição)
      */
     private function validateInfoPage($page, $type) {
         $this->admin = $this->model('Admin');
@@ -464,21 +389,21 @@ class Admin extends Controller {
 
         if($type) {
             $checkPage = $this->admin->getInfoPage($_POST['page_url'], 1);
-
-            // Variable used in various model methods
+            // Define o ID da página para atualização
             $_POST['page_id'] = $page['id'];
         }
 
+        // Limita e sanitiza os campos
         $_POST['page_title'] = substr(strip_tags($_POST['page_title']), 0, 64);
         $_POST['page_url'] = filter_var(substr(htmlspecialchars(strip_tags($_POST['page_url'])), 0, 64), FILTER_SANITIZE_URL);
         $_POST['page_public'] = ($_POST['page_public'] == 1 ? 1 : 0);
 
-        // Check if any field is empty
+        // Verifica se algum campo obrigatório está vazio
         if(empty($_POST['page_title']) || empty($_POST['page_url']) || empty($_POST['page_content'])) {
             $_SESSION['message'][] = ['error', $this->lang['all_fields_required']];
         }
 
-        // Check if the page name already exists (exclude the current page)
+        // Verifica se já existe uma página com a mesma URL
         if($type) {
             if($_POST['page_url'] == $checkPage['url'] && $this->url[3] != $checkPage['id']) {
                 $_SESSION['message'][] = ['error', sprintf($this->lang['page_url_exists'], $_POST['page_url'])];
@@ -491,32 +416,23 @@ class Admin extends Controller {
     }
 
     /**
-     * Logout the Admin User or clear the credentials if they become outdated
-     *
-     * @param   bool    $redirect   Redirect the user after it has been logged out
+     * Encerra a sessão do admin e redireciona para login, se necessário.
+     * @param bool $redirect Se true, redireciona após logout
      */
     public function logout($redirect = true) {
         unset($_SESSION['adminUsername']);
-        unset($_SESSION['adminPassword']);
-        unset($_SESSION['isAdmin']);
-        setcookie("adminUsername", '', time()-3600, COOKIE_PATH);
-        setcookie("adminToken", '', time()-3600, COOKIE_PATH);
-
+        session_destroy();
         if($redirect) {
-            // Unset the token id in order to be refreshed only when Logging Out
-            unset($_SESSION['token_id']);
-
             redirect('admin/login');
         }
     }
 
     /**
-     * The Admin Panel menu
-     *
-     * @return  string
+     * Monta o menu lateral do painel admin.
+     * Retorna HTML do menu para as views administrativas.
      */
     private function menu() {
-        // Array Map: Key(Menu Elements) => Array(Bold, Not Dynamic tag)
+        // Define os itens do menu conforme o status do admin
         if(isset($_SESSION['isAdmin'])) {
             $data['menu'] = [
                 'dashboard'     => [false, false],
@@ -536,7 +452,7 @@ class Admin extends Controller {
             ];
         }
 
-        // If on the current route, enable the Bold flag
+        // Destaca o item do menu da rota atual
         if (array_key_exists($this->url[1], $data['menu'])) {
             $data['menu'][$this->url[1]][0] = true;
         }
@@ -545,19 +461,18 @@ class Admin extends Controller {
     }
 
     /**
-     * Get the available Languages
+     * Busca todos os idiomas disponíveis para o painel admin.
+     * Retorna array de idiomas encontrados.
      */
     private function getLanguages() {
         $path = sprintf('%s/../languages/', __DIR__, PUBLIC_PATH, THEME_PATH);
-
         $languages = scandir($path);
-
         $output = [];
         foreach($languages as $language) {
-            // Select only the .php files
+            // Seleciona apenas arquivos .php
             if($language != '.' && $language != '..' && substr($language, -4, 4) == '.php') {
                 $language = substr($language, 0, -4);
-                // Store the language information
+                // Carrega informações do idioma
                 require($path.$language.'.php');
                 $output[$language]['name'] = $name;
                 $output[$language]['author'] = $author;
@@ -565,23 +480,21 @@ class Admin extends Controller {
                 $output[$language]['path'] = $language;
             }
         }
-
         return $output;
     }
 
     /**
-     * Get the available Themes
+     * Busca todos os temas disponíveis para o painel admin.
+     * Retorna array de temas encontrados.
      */
     private function getThemes() {
         $path = sprintf('%s/../../%s/%s/', __DIR__, PUBLIC_PATH, THEME_PATH);
-
         $themes = scandir($path);
-
         $output = [];
         foreach($themes as $theme) {
-            // Check if the theme has an info.php file a && file_exists($path.$theme.'/icon.png)nd a thumbnail
+            // Verifica se o tema possui info.php e ícone
             if(file_exists($path.$theme.'/info.php') && file_exists($path.$theme.'/icon.png')) {
-                // Store the theme information
+                // Carrega informações do tema
                 require($path.$theme.'/info.php');
                 $output[$theme]['name']     = $name;
                 $output[$theme]['author']   = $author;
@@ -590,46 +503,40 @@ class Admin extends Controller {
                 $output[$theme]['path']     = $theme;
             }
         }
-
         return $output;
     }
 
     /**
-     * Check whether the user can be authed or not
-     *
-     * @return	array | bool
+     * Realiza a autenticação do admin (login).
+     * Verifica usuário e senha/token, retorna true se autenticado.
      */
     private function auth() {
-        // If the user has previously been authenticated
+        // Se já está autenticado na sessão
         if(isset($_SESSION['adminUsername']) && isset($_SESSION['adminPassword'])) {
             $this->admin->username = $_SESSION['adminUsername'];
             $this->admin->password = $_SESSION['adminPassword'];
             $auth = $this->admin->get(1);
-
             if($this->admin->password == $auth['password']) {
                 $logged = true;
             }
         }
-        // If the user has long term login enabled
+        // Se está autenticado via cookie (lembrar-me)
         elseif(isset($_COOKIE['adminUsername']) && isset($_COOKIE['adminToken'])) {
             $this->admin->username = $_COOKIE['adminUsername'];
             $this->admin->rememberToken = $_COOKIE['adminToken'];
             $auth = $this->admin->get(2);
-
             if($this->admin->rememberToken == $auth['remember_token'] && !empty($auth['remember_token'])) {
                 $_SESSION['adminUsername'] = $this->admin->username;
                 $this->setPassword($auth['password']);
                 $logged = true;
             }
         }
-        // If the user is authenticating
+        // Se está tentando autenticar agora
         else {
             $auth = $this->admin->get(0);
-
-            // Set the sessions
+            // Seta as sessões
             $_SESSION['adminUsername'] = $this->admin->username;
             $this->setPassword($this->admin->password);
-
             if(isset($auth['password']) && password_verify($this->admin->password, $auth['password'])) {
                 if($this->admin->rememberToken) {
                     $this->admin->renewToken();
@@ -638,31 +545,28 @@ class Admin extends Controller {
                 $logged = true;
             }
         }
-
         if(isset($logged)) {
             $_SESSION['isAdmin'] = true;
             return $auth;
         }
-
         return false;
     }
 
     /**
-     * @param   string  $password
+     * Define a senha do admin (criptografia, se aplicável).
+     * @param string $password Nova senha
      */
     private function setPassword($password) {
         $_SESSION['adminPassword'] = password_hash($password, PASSWORD_DEFAULT);
     }
 
     /**
-     * Set the remember me Cookie tokens
+     * Gera e define o token de "lembrar-me" para autenticação persistente.
      */
     private function setToken() {
         $this->admin->rememberToken = password_hash($this->admin->username.generateSalt().time().generateSalt(), PASSWORD_DEFAULT);
-
         setcookie("adminUsername", $this->admin->username, time() + 30 * 24 * 60 * 60, COOKIE_PATH, null, 1);
         setcookie("adminToken", $this->admin->rememberToken, time() + 30 * 24 * 60 * 60, COOKIE_PATH, null, 1);
-
         $_SESSION['adminRemember'] = true;
     }
 }

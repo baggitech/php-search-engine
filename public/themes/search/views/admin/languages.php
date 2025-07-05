@@ -13,7 +13,7 @@ defined('FIR') OR exit();
             <div class="list-col-button"><button type="submit" name="language" value="<?=$language['path']?>"<?=($data['settings']['site_language'] == $language['path'] ? ' disabled' : '')?>><?=($data['settings']['site_language'] == $language['path'] ? $lang['default'] : $lang['make_default'])?></button></div>
             <div class="list-col-content list-col-content-full">
                 <div><strong><a href="<?=$language['url']?>" target="_blank" data-nd><?=$language['name']?></a></strong></div>
-                <div><?=$lang['by']?>: <a href="<?=$language['url']?>" target="_blank" data-nd><?=$language['author']?></a></div>
+                <div><?=$lang['by']?>: <a href="<?=$language['url']?>" target="_blank" data-nd><?=$language['author'] ?? 'Lázaro Baggi (Baggitech) - baggitech@gmail.com'?></a></div>
             </div>
         </div>
         <?php endforeach ?>

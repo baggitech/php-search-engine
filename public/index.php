@@ -3,9 +3,10 @@
 /**
  * Fir. A lightweight PHP MVC Framework.
  *
- * @author Pricop Alexandru
- * @copyright Pricop Alexandru - Mihai. All rights reserved.
- * @link http://pricop.info
+ * @author Lázaro Baggi (Baggitech) - baggitech@gmail.com
+ * @copyright Lázaro Baggi (Baggitech) - Brasil. All rights reserved.
+ * @version 1.0
+ * @link https://baggitech.com.br
  */
 
 require_once(__DIR__ . '/../app/includes/config.php');

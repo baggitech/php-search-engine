@@ -1,9 +1,9 @@
 <?php
 
 /**
- * Convert the characters into HTML entities
+ * Converte caracteres em entidades HTML
  *
- * @param   string  $value  The string to be escaped
+ * @param   string  $value  A string a ser escapada
  * @return  string
  */
 function e($value) {
@@ -11,19 +11,21 @@ function e($value) {
 }
 
 /**
- * Limit the amount of characters in a string and provide an excerpt of it
+ * Limita a quantidade de caracteres em uma string e fornece um trecho dela
  *
- * @param   string  $value      The string to extract the substring from
- * @param   int     $start      The character number to start from, counting from 0
- * @param   int     $length     The maximum number of characters to be used from the string
- * @param   array   $options    The string to be appended
+ * @param   string  $value      String de origem
+ * @param   int     $start      Posição inicial (começando do 0)
+ * @param   int     $length     Número máximo de caracteres
+ * @param   array   $options    String a ser adicionada ao final (ex: reticências)
  * @return  string
  */
 function str_limit($value, $start = 0, $length = null, $options = []) {
     $result = mb_substr($value, $start, $length);
 
+    // Se a string original for maior que o limite e o limite não for nulo
     if(mb_strlen($value) > $length && is_null($length) == false) {
         if(isset($options['ellipsis'])) {
+            // Adiciona reticências ou outro sufixo
             $result = $result.$options['ellipsis'];
         }
     }
@@ -32,38 +34,35 @@ function str_limit($value, $start = 0, $length = null, $options = []) {
 }
 
 /**
- * Truncates text.
+ * Trunca textos.
  *
- * Cuts a string to the length of $length and replaces the last characters
- * with the ellipsis if the text is longer than length.
+ * Corta uma string para o tamanho desejado e adiciona reticências se necessário.
  *
- * ### Options:
+ * Opções:
+ * - 'ellipsis': Sufixo a ser adicionado ao final (ex: ...)
+ * - 'exact': Se false, não corta palavras ao meio
+ * - 'html': Se true, trata corretamente tags HTML
  *
- * - `ellipsis` Will be used as ending and appended to the trimmed string
- * - `exact` If false, $text will not be cut mid-word
- * - `html` If true, HTML tags would be handled correctly
- *
- * @param   string  $text       String to truncate.
- * @param   int     $length     Length of returned string, including ellipsis.
- * @param   array   $options    An array of HTML attributes and options.
+ * @param   string  $text       Texto a ser truncado
+ * @param   int     $length     Tamanho máximo (incluindo reticências)
+ * @param   array   $options    Opções adicionais
  * @return  string
  */
 function truncate($text, $length = 100, $options = []) {
     $default = ['ellipsis' => '...', 'exact' => true, 'html' => false];
-
     $options += $default;
-
     $prefix = '';
     $suffix = $options['ellipsis'];
 
     if($options['html']) {
+        // Calcula o tamanho das reticências sem tags HTML
         $ellipsisLength = mb_strlen(strip_tags($options['ellipsis']));
-
         $truncateLength = 0;
         $totalLength = 0;
         $openTags = [];
         $truncate = '';
 
+        // Percorre o texto identificando tags HTML e conteúdo
         preg_match_all('/(<\/?([\w+]+)[^>]*>)?([^<>]*)/', $text, $tags, PREG_SET_ORDER);
         foreach($tags as $tag) {
             $contentLength = 0;
@@ -73,6 +72,7 @@ function truncate($text, $length = 100, $options = []) {
             }
 
             if($truncate === '') {
+                // Gerencia tags abertas e fechadas
                 if(!preg_match('/img|br|input|hr|area|base|basefont|col|frame|isindex|link|meta|param/i', $tag[2])) {
                     if(preg_match('/<[\w]+[^>]*>/', $tag[0])) {
                         array_unshift($openTags, $tag[2]);
@@ -83,9 +83,8 @@ function truncate($text, $length = 100, $options = []) {
                         }
                     }
                 }
-
                 $prefix .= $tag[1];
-
+                // Verifica se atingiu o limite de caracteres
                 if($totalLength + $contentLength + $ellipsisLength > $length) {
                     $truncate = $tag[3];
                     $truncateLength = $length - $totalLength;
@@ -93,66 +92,58 @@ function truncate($text, $length = 100, $options = []) {
                     $prefix .= $tag[3];
                 }
             }
-
             $totalLength += $contentLength;
             if($totalLength > $length) {
                 break;
             }
         }
-
+        // Se o texto for menor que o limite, retorna o texto original
         if($totalLength <= $length) {
             return $text;
         }
-
         $text = $truncate;
         $length = $truncateLength;
-
+        // Fecha as tags HTML abertas
         foreach($openTags as $tag) {
             $suffix .= '</'.$tag.'>';
         }
     } else {
+        // Se o texto for menor que o limite, retorna o texto original
         if(mb_strlen($text) <= $length) {
             return $text;
         }
         $ellipsisLength = mb_strlen($options['ellipsis']);
     }
-
+    // Corta o texto no limite definido
     $result = mb_substr($text, 0, $length - $ellipsisLength);
-
     if(!$options['exact']) {
+        // Se não for corte exato, remove a última palavra para não cortar no meio
         if(mb_substr($text, $length - $ellipsisLength, 1) !== ' ') {
             $result = removeLastWord($result);
         }
-
-        // If result is empty, then we don't need to count ellipsis in the cut.
+        // Se o resultado ficar vazio, corta sem considerar as reticências
         if(!strlen($result)) {
             $result = mb_substr($text, 0, $length);
         }
     }
-
     return $prefix.$result.$suffix;
 }
 
 /**
- * Removes the last word from the input text.
+ * Remove a última palavra do texto informado
  *
- * @param   string  $text   The input text
+ * @param   string  $text   Texto de entrada
  * @return  string
  */
 function removeLastWord($text) {
     $spacePos = mb_strrpos($text, ' ');
-
     if($spacePos !== false) {
         $lastWord = mb_strrpos($text, $spacePos);
-
-        // Some languages are written without word separation.
-        // We recognize a string as a word if it doesn't contain any full-width characters.
+        // Para idiomas sem separação de palavras, verifica se é uma palavra
         if(mb_strwidth($lastWord) === mb_strlen($lastWord)) {
             $text = mb_substr($text, 0, $spacePos);
         }
-
         return $text;
     }
-
     return '';
 }

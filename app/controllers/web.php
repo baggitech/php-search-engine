@@ -7,6 +7,19 @@ use Fir\Libraries\MorseCode;
 use Fir\Libraries\LoremIpsum;
 use Fir\Libraries\Search;
 
+/**
+ * Controller responsável pela busca web (sites)
+ * Processa requisições de busca, aplica filtros, paginação, respostas instantâneas e exibe resultados web
+ * 
+ * Funcionalidades principais:
+ * - Busca de sites na web
+ * - Controle de limite de buscas por IP
+ * - Filtros de busca (período, tipo de arquivo, safe search)
+ * - Paginação de resultados
+ * - Respostas instantâneas (calculadora, conversões, etc.)
+ * - Formatação de dados (datas, visualizações, duração)
+ * - Suporte a múltiplos mercados/idiomas
+ */
 class Web extends Controller {
 
     /**
@@ -14,12 +27,26 @@ class Web extends Controller {
      */
     protected $model;
 
+    /**
+     * Método principal que processa as buscas web.
+     * 
+     * Fluxo de execução:
+     * 1. Verifica limite de buscas por IP
+     * 2. Valida parâmetros de busca
+     * 3. Configura filtros de resposta da API
+     * 4. Aplica filtros de busca (período, tipo, safe search)
+     * 5. Executa a busca na API
+     * 6. Processa e formata os resultados
+     * 7. Renderiza a view com os dados
+     * 
+     * @return array Dados processados para renderização
+     */
     public function index() {
         $search_limit = false;
 
         $data['menu_view'] = $this->getMenu();
 
-        // If search per IP is enabled
+        // Se o limite de busca por IP está habilitado
         if($this->settings['search_per_ip'] > 0) {
             $this->model = $this->model('SearchLimit');
 
@@ -27,11 +54,11 @@ class Web extends Controller {
 
             $user['count'] = isset($user['count']) ? $user['count'] : 0;
 
-            // If the user has done more queries than allowed in a given time frame
+            // Se o usuário excedeu o limite de consultas permitidas no período
             if($user['count'] >= $this->settings['search_per_ip'] && (time()-strtotime($user['updated_at']) < $this->settings['search_time'])) {
                 $search_limit = true;
             } else {
-                // Reset the counter if the time frame has exceeded
+                // Reseta o contador se o período de tempo foi excedido
                 if(isset($user['updated_at']) && time()-strtotime($user['updated_at']) > $this->settings['search_time']) {
                     $this->model->resetIp(['ip' => $_SERVER['REMOTE_ADDR']]);
                 } else {
@@ -40,7 +67,7 @@ class Web extends Controller {
             }
         }
 
-        // If there's no query, redirect the user to the home page
+        // Se não há consulta, redireciona para a página inicial
         if(isset($_GET['q']) == false || empty($_GET['q']) || $this->settings['web_per_page'] == 0) {
             redirect();
         }
@@ -50,7 +77,7 @@ class Web extends Controller {
         $search->endpoint = 'search';
 
         $responseFilter[] = "WebPages";
-        // Include the search type in the responseFilter, if they are enabled
+        // Inclui o tipo de busca no responseFilter, se estiverem habilitados
         if($this->settings['images_per_page'] > 0 && $this->settings['search_answers']) {
             $responseFilter[] = "Images";
         }
@@ -64,7 +91,7 @@ class Web extends Controller {
             $responseFilter[] = "RelatedSearches";
         }
         if($this->settings['search_entities']) {
-            // Request entities only from the available markets
+            // Solicita entidades apenas dos mercados disponíveis
             if(in_array((isset($_COOKIE['market']) && in_array($_COOKIE['market'], array_keys($search->getMarkets())) ? $_COOKIE['market'] : $this->settings['search_market']), ['en-AU', 'en-CA', 'fr-CA', 'fr-FR', 'de-DE', 'en-IN', 'it-IT', 'es-MX', 'en-GB', 'en-US', 'en-US', 'es-US', 'es-ES', 'pt-BR'])) {
                 $responseFilter[] = 'Entities';
             }
@@ -74,49 +101,49 @@ class Web extends Controller {
         $perPage = $this->settings['web_per_page'];
         $filters = $this->searchFilters(true);
 
-        // Results per page filter (added +1 result to verify if there's extra results for next page
+        // Filtro de resultados por página (adiciona +1 resultado para verificar se há resultados extras para próxima página
         $params['count'] = $perPage+1;
-        // Pagination filter
+        // Filtro de paginação
         if(isset($_GET['offset']) && ctype_digit($_GET['offset'])) {
             $params['offset'] = $_GET['offset'];
         } else {
             $params['offset'] = 0;
         }
-        // Past period filter
+        // Filtro de período passado
         if(isset($_GET['freshness']) && in_array($_GET['freshness'], array_keys($filters[0]['period'][1]))) {
             $params['freshness'] = $_GET['freshness'];
         }
-        // File type filter
+        // Filtro de tipo de arquivo
         if(isset($_GET['fileType']) && in_array($_GET['fileType'], array_keys($filters[0]['type'][1]))) {
             $fileType = 'filetype:'.$_GET['fileType'].' ';
         } else {
             $fileType = '';
         }
-        // Safe search filter
+        // Filtro de busca segura
         if(isset($_GET['safeSearch']) && in_array($_GET['safeSearch'], array_keys($filters[0]['safe_search'][1]))) {
             $params['safeSearch'] = $_GET['safeSearch'];
         } else {
             $params['safeSearch'] = $_COOKIE['safe_search'];
         }
-        // Highlight filter
+        // Filtro de destaque
         $params['textDecorations'] = $_COOKIE['highlight'];
         $params['textFormat'] = 'HTML';
 
-        // Filters filter
+        // Filtro de filtros
         if(isset($_GET['filters'])) {
             $params['filters'] = $_GET['filters'];
         }
 
-        // Market
+        // Mercado
         $params['mkt'] = (in_array($_COOKIE['market'], array_keys($search->getMarkets())) ? $_COOKIE['market'] : 'en-US');
 
-        // Search specific sites
+        // Busca em sites específicos
         $specificSites = $search->specificSites($this->settings['search_sites']);
 
-        // Query
+        // Consulta
         $params['q'] = $fileType.$_GET['q'].$specificSites;
 
-        // Get Instant Answers if on the first page of the search
+        // Obtém Respostas Instantâneas se estiver na primeira página da busca
         $data['result_ia_view'] = ($params['offset'] == 0 ? $this->evaluateQuery($_GET['q']) : false);
 
         if($search_limit == false) {
@@ -133,7 +160,7 @@ class Web extends Controller {
 
         $data['response'] = json_decode($request, true);
 
-        // If the Safe Ads feature is enabled and the Safe Search is off
+        // Se o recurso Safe Ads está habilitado e o Safe Search está desligado
         if($this->settings['ads_safe'] == 1 && $params['safeSearch'] == 'Off') {
             $data['show_ads'] = false;
         } else {
@@ -144,19 +171,19 @@ class Web extends Controller {
         $errType = 0;
 
         if(isset($data['response']['webPages']['value']) && !empty($data['response']['webPages']['value']) && $search_limit == false) {
-            // Validate data
+            // Valida dados
             if(isset($data['response']['images']['value'])) {
                 foreach($data['response']['images']['value'] as $key => $value) {
-                    // Get the domain name from URL and clean up www prefix
+                    // Obtém o nome do domínio da URL e remove o prefixo www
                     $data['response']['images']['value'][$key]['displayUrl'] = str_replace('www.', '', parse_url($value['hostPageUrl'], PHP_URL_HOST));
                 }
             }
 
             if(isset($data['response']['videos']['value'])) {
                 foreach($data['response']['videos']['value'] as $key => $value) {
-                    // Format the views counter
+                    // Formata o contador de visualizações
                     $data['response']['videos']['value'][$key]['viewCount'] = isset($value['viewCount']) ? formatViews($value['viewCount']) : false;
-                    // Format the published date
+                    // Formata a data de publicação
                     $date = isset($value['datePublished']) ? explode('-', date('Y-m-d', strtotime($value['datePublished']))) : '';
                     $data['response']['videos']['value'][$key]['datePublished'] = !empty($date) ? sprintf($this->lang['date_format'], $date[0], substr($this->lang['month_'.$date[1]], 0, 3), $date[2]) : '';
 
@@ -169,13 +196,13 @@ class Web extends Controller {
 
             if(isset($data['response']['news']['value'])) {
                 foreach($data['response']['news']['value'] as $key => $value) {
-                    // Format the published date
+                    // Formata a data de publicação
                     $date = isset($value['datePublished']) ? explode('-', date('Y-m-d', strtotime($value['datePublished']))) : '';
                     $data['response']['news']['value'][$key]['datePublished'] = !empty($date) ? sprintf($this->lang['date_format'], $date[0], substr($this->lang['month_'.$date[1]], 0, 3), $date[2]) : '';
                 }
             }
 
-            // If there are extra results for the next page
+            // Se há resultados extras para a próxima página
             foreach($data['response']['rankingResponse']['mainline']['items'] as $key => $value) {
                 if ($key >= $perPage) {
                     $data['next_button'] = true;
@@ -194,7 +221,7 @@ class Web extends Controller {
 
             if(isset($data['response']['entities'])) {
                 foreach($data['response']['entities']['value'] as $key => $value) {
-                    // Format the display url
+                    // Formata a URL de exibição
                     if(isset($value['url'])) {
                         $data['response']['entities']['value'][$key]['displayUrl'] = str_replace('www.', '', parse_url($value['url'], PHP_URL_HOST));
                     }
@@ -254,133 +281,143 @@ class Web extends Controller {
     }
 
     /**
-     * Evaluate the query to provide an Instant Answer
-     *
-     * @param   string  $query The string to be evaluated
-     *
-     * @return  string
+     * Avalia a consulta para fornecer uma Resposta Instantânea.
+     * 
+     * Este método analisa a consulta do usuário e identifica padrões específicos
+     * que podem ser respondidos instantaneamente sem precisar fazer uma busca na web.
+     * 
+     * Funcionalidades suportadas:
+     * - Informações do usuário (IP, hora, data)
+     * - Ferramentas (moeda, cronômetro, dados)
+     * - Conversões (QR Code, cores hex, MD5, Base64)
+     * - Manipulação de texto (ordenar, inverter, case)
+     * - Cálculos (ano bissexto, PI, tempo Unix)
+     * - Criptografia (Morse, Atbash, UUID)
+     * 
+     * @param   string  $query A string a ser avaliada
+     * @return  string  HTML da resposta instantânea ou false se não houver match
      */
     private function evaluateQuery($query) {
-        // What's my IP
+        // Qual é meu IP
         foreach($this->lang['ia']['ip'] as $t) {
-            // Matches "trigger"
+            // Verifica se a consulta corresponde ao trigger
             if(preg_match(sprintf('/^%s$/ui', $t), $query, $match)) {
                 return $this->iaGetUserIp();
             }
         }
 
-        // Current user time
+        // Hora atual do usuário
         foreach($this->lang['ia']['time'] as $t) {
-            // Matches "trigger"
+            // Verifica se a consulta corresponde ao trigger
             if(preg_match(sprintf('/^%s$/ui', $t), $query, $match)) {
                 return $this->iaGetUserTime();
             }
         }
 
-        // Current user date
+        // Data atual do usuário
         foreach($this->lang['ia']['date'] as $t) {
-            // Matches "trigger"
+            // Verifica se a consulta corresponde ao trigger
             if(preg_match(sprintf('/^%s$/ui', $t), $query, $match)) {
                 return $this->iaGetUserDate();
             }
         }
 
-        // Flip coin
+        // Jogar moeda
         foreach($this->lang['ia']['flip_coin'] as $t) {
-            // Matches "trigger"
+            // Verifica se a consulta corresponde ao trigger
             if(preg_match(sprintf('/^%s$/ui', $t), $query, $match)) {
                 return $this->iaFlipCoin();
             }
         }
 
-        // Stopwatch
+        // Cronômetro
         foreach($this->lang['ia']['stopwatch'] as $t) {
-            // Matches "trigger"
+            // Verifica se a consulta corresponde ao trigger
             if(preg_match(sprintf('/^%s$/ui', $t), $query, $match)) {
                 return $this->iaStopwatch();
             }
         }
 
-        // Roll
+        // Jogar dados
         foreach($this->lang['ia']['roll'] as $t) {
-            // Matches "trigger digits"
+            // Verifica se a consulta corresponde ao trigger seguido de dígitos
             if(preg_match(sprintf('/%s ([0-9]+)/iu', $t), $query, $match)) {
                 return $this->iaRoll($match);
             }
         }
 
-        // QR Code
+        // Código QR
         foreach($this->lang['ia']['qr_code'] as $t) {
-            // Matches "trigger string", "string trigger"
+            // Verifica se a consulta corresponde ao trigger seguido de string ou string seguida do trigger
             if(preg_match(sprintf('/^%s\s(.+)|(.+)\s%s$/iu', $t, $t), $query, $match)) {
                 return $this->iaQrCode($match);
             }
         }
 
-        // Sort descending
+        // Ordenar decrescente
         foreach($this->lang['ia']['sort_desc'] as $t) {
-            // Matches "trigger string"
+            // Verifica se a consulta corresponde ao trigger seguido de string
             if(preg_match(sprintf('/^%s\s(.+)$/iu', $t), $query, $match)) {
                 return $this->iaSort($match, 2);
             }
         }
 
-        // Sort ascending
+        // Ordenar crescente
         foreach($this->lang['ia']['sort_asc'] as $t) {
-            // Matches "trigger string"
+            // Verifica se a consulta corresponde ao trigger seguido de string
             if(preg_match(sprintf('/^%s\s(.+)$/iu', $t), $query, $match)) {
                 return $this->iaSort($match, 1);
             }
         }
 
-        // Reverse text
+        // Inverter texto
         foreach($this->lang['ia']['reverse_text'] as $t) {
-            // Matches "trigger string"
+            // Verifica se a consulta corresponde ao trigger seguido de string
             if(preg_match(sprintf('/^%s\s(.+)$/iu', $t), $query, $match)) {
                 return $this->iaReverseText($match);
             }
         }
 
-        // Hex color
+        // Cor hexadecimal
         if(preg_match('/^#([a-fA-F0-9]{6})$/iu', $query, $match) || preg_match('/^#([a-fA-F0-9]{3})/iu', $query, $match)) {
             return $this->iaHexColor($match);
         }
 
         // MD5
         foreach($this->lang['ia']['md5'] as $t) {
-            // Matches "trigger string"
+            // Verifica se a consulta corresponde ao trigger seguido de string
             if(preg_match(sprintf('/^%s\s(.+)$/iu', $t), $query, $match)) {
                 return $this->iaMD5($match);
             }
         }
 
-        // Base64 encode
+        // Base64 codificar
         foreach($this->lang['ia']['base64_encode'] as $t) {
-            // Matches "trigger string"
+            // Verifica se a consulta corresponde ao trigger seguido de string
             if(preg_match(sprintf('/^%s\s(.+)$/iu', $t), $query, $match)) {
                 return $this->iaBase64($match, 1);
             }
         }
 
-        // Base64 decode
+        // Base64 decodificar
         foreach($this->lang['ia']['base64_decode'] as $t) {
-            // Matches "trigger string"
+            // Verifica se a consulta corresponde ao trigger seguido de string
             if(preg_match(sprintf('/^%s\s(.+)$/iu', $t), $query, $match)) {
                 return $this->iaBase64($match, 2);
             }
         }
 
-        // Lowercase
+        // Minúsculas
         foreach($this->lang['ia']['lowercase'] as $t) {
-            // Matches "trigger string"
+            // Verifica se a consulta corresponde ao trigger seguido de string
             if(preg_match(sprintf('/^%s\s(.+)$/iu', $t), $query, $match)) {
                 return $this->iaCase($match, 1);
             }
         }
 
-        // Uppercase
+        // Maiúsculas
         foreach($this->lang['ia']['uppercase'] as $t) {
-            // Matches "trigger string"
+            // Verifica se a consulta corresponde ao trigger seguido de string
             if(preg_match(sprintf('/^%s\s(.+)$/iu', $t), $query, $match)) {
                 return $this->iaCase($match, 2);
             }
@@ -388,23 +425,23 @@ class Web extends Controller {
 
         // Camelcase
         foreach($this->lang['ia']['camelcase'] as $t) {
-            // Matches "trigger string"
+            // Verifica se a consulta corresponde ao trigger seguido de string
             if(preg_match(sprintf('/^%s\s(.+)$/iu', $t), $query, $match)) {
                 return $this->iaCase($match, 3);
             }
         }
 
-        // Leap Year
+        // Ano bissexto
         foreach($this->lang['ia']['leap_year'] as $t) {
-            // Matches "trigger digits", "digits trigger"
+            // Verifica se a consulta corresponde ao trigger seguido de dígitos ou dígitos seguidos do trigger
             if(preg_match(sprintf('/(.*?)(%s)(.*?)(\d+)(.*?)$/iu', $t), $query, $match) || preg_match(sprintf('/(.*?)(\d+)(.*?)(%s)(.*?)$/iu', $t), $query, $match)) {
                 return $this->iaLeapYear($match);
             }
         }
 
-        // Screen Resolution
+        // Resolução da tela
         foreach($this->lang['ia']['screen_resolution'] as $t) {
-            // Matches "trigger"
+            // Verifica se a consulta corresponde ao trigger
             if(preg_match(sprintf('/^%s$/ui', $t), $query, $match)) {
                 return $this->iaUserScreenResolution();
             }
@@ -412,33 +449,33 @@ class Web extends Controller {
 
         // Pi
         foreach($this->lang['ia']['pi'] as $t) {
-            // Matches "trigger"
+            // Verifica se a consulta corresponde ao trigger
             if(preg_match(sprintf('/^%s$/ui', $t), $query, $match)) {
                 return $this->iaPi();
             }
         }
 
-        // Morse Code
+        // Código Morse
         foreach($this->lang['ia']['morse_code'] as $t) {
-            // Matches "trigger string"
+            // Verifica se a consulta corresponde ao trigger seguido de código morse
             if(preg_match(sprintf('/^%s\s([.\-\/\s]+)*$/iu', $t), $query, $match)) {
                 return $this->iaMorseCode($match, 2);
             }
 
-            // Matches "trigger string"
+            // Verifica se a consulta corresponde ao trigger seguido de string
             if(preg_match(sprintf('/^%s\s(.+)$/iu', $t), $query, $match)) {
                 return $this->iaMorseCode($match, 1);
             }
         }
 
-        // Unix Time
+        // Tempo Unix
         foreach($this->lang['ia']['unix_time'] as $t) {
-            // Matches "trigger digits"
+            // Verifica se a consulta corresponde ao trigger seguido de dígitos
             if(preg_match(sprintf('/^%s\s(\d+)$/iu', $t), $query, $match)) {
                 return $this->iaUnixTime($match, 1);
             }
 
-            // Matches "trigger"
+            // Verifica se a consulta corresponde ao trigger
             if(preg_match(sprintf('/^%s$/iu', $t), $query, $match)) {
                 return $this->iaUnixTime($match, 2);
             }
@@ -446,15 +483,15 @@ class Web extends Controller {
 
         // Lorem Ipsum
         foreach($this->lang['ia']['lorem_ipsum'] as $t) {
-            // Matches "trigger", "trigger digits"
+            // Verifica se a consulta corresponde ao trigger ou trigger seguido de dígitos
             if(preg_match(sprintf('/^(%s)\s?(\d+)?$/ui', $t), $query, $match)) {
                 return $this->iaLoremIpsum($match);
             }
         }
 
-        // Atbash Cipher
+        // Cifra Atbash
         foreach($this->lang['ia']['atbash'] as $t) {
-            // Matches "trigger string"
+            // Verifica se a consulta corresponde ao trigger seguido de string alfanumérica
             if(preg_match(sprintf('/^%s\s([a-z0-9\s]+)$/i', $t), $query, $match)) {
                 return $this->iaAtbashCipher($match);
             }
@@ -462,7 +499,7 @@ class Web extends Controller {
 
         // UUID
         foreach($this->lang['ia']['uuid'] as $t) {
-            // Matches "trigger"
+            // Verifica se a consulta corresponde ao trigger
             if(preg_match(sprintf('/^%s$/ui', $t), $query, $match)) {
                 return $this->iaUUID($match);
             }
@@ -472,7 +509,9 @@ class Web extends Controller {
     }
 
     /**
-     * @return string
+     * Retorna o endereço IP do usuário.
+     * 
+     * @return string HTML renderizado com o IP do usuário
      */
     private function iaGetUserIp() {
         $data['result'] = $_SERVER['REMOTE_ADDR'];
@@ -480,7 +519,10 @@ class Web extends Controller {
     }
 
     /**
-     * @return string
+     * Retorna a hora atual do usuário.
+     * Prepara dados dos meses para formatação da hora.
+     * 
+     * @return string HTML renderizado com a hora atual
      */
     private function iaGetUserTime() {
         $data = [];
@@ -491,7 +533,10 @@ class Web extends Controller {
     }
 
     /**
-     * @return string
+     * Retorna a data atual do usuário.
+     * Prepara dados dos meses para formatação da data.
+     * 
+     * @return string HTML renderizado com a data atual
      */
     private function iaGetUserDate() {
         $data = [];
@@ -502,7 +547,10 @@ class Web extends Controller {
     }
 
     /**
-     * @return string
+     * Simula o lançamento de uma moeda (cara ou coroa).
+     * Gera um número aleatório entre 0 e 1 para determinar o resultado.
+     * 
+     * @return string HTML renderizado com o resultado do lançamento
      */
     private function iaFlipCoin() {
         $rand = rand(0, 1);
@@ -511,18 +559,26 @@ class Web extends Controller {
     }
 
     /**
-     * @return string
+     * Exibe um cronômetro interativo.
+     * 
+     * @return string HTML renderizado com o cronômetro
      */
     private function iaStopwatch() {
         return $this->view->render(null, 'web/ia/stopwatch');
     }
 
     /**
-     * @param   $value
-     * @return  string
+     * Simula o lançamento de dados com um número específico de faces.
+     * 
+     * Validações:
+     * - Se o valor for maior que 1 milhão, define como 1 milhão (evita quebrar o valor máximo do mt_rand)
+     * - Se o valor for menor que 1, define como 1
+     * 
+     * @param array $value Array contendo o número de faces do dado
+     * @return string HTML renderizado com o resultado do lançamento
      */
     private function iaRoll($value) {
-        // If the value provided is larger than 1 million, default to 1 million (prevents breaking mt_rand max value)
+        // Se o valor fornecido for maior que 1 milhão, define como 1 milhão (evita quebrar o valor máximo do mt_rand)
         if($value[1] > 1000000) {
             $total = 1000000;
         } elseif($value[1] < 1) {
@@ -537,8 +593,10 @@ class Web extends Controller {
     }
 
     /**
-     * @param $value
-     * @return string
+     * Gera um código QR para o texto fornecido.
+     * 
+     * @param array $value Array contendo o texto para gerar o QR Code
+     * @return string HTML renderizado com o QR Code
      */
     private function iaQrCode($value) {
         $data['result'] = !empty($value[1]) ? $value[1] : $value[2];
@@ -546,22 +604,29 @@ class Web extends Controller {
     }
 
     /**
-     * @param   $value
-     * @param   $direction
-     * @return  string
+     * Ordena uma lista de números em ordem crescente ou decrescente.
+     * 
+     * Processo:
+     * 1. Divide a string em números usando espaços, vírgulas ou ponto e vírgula
+     * 2. Remove caracteres não numéricos da lista
+     * 3. Ordena os números conforme a direção especificada
+     * 
+     * @param array $value Array contendo a string com números
+     * @param int $direction 1 para crescente, 2 para decrescente
+     * @return string HTML renderizado com a lista ordenada
      */
     private function iaSort($value, $direction) {
         $data['direction'] = $direction;
         $data['result'] = preg_split('/[\s,;]+/iu', $value[1]);
 
-        // Remove any non digit character from the list
+        // Remove qualquer caractere não numérico da lista
         foreach($data['result'] as $key => $val) {
             if(!is_numeric($val)) {
                 unset($data['result'][$key]);
             }
         }
 
-        // Order direction
+        // Direção da ordenação
         if($direction == 1) {
             sort($data['result']);
         } else {
@@ -572,8 +637,10 @@ class Web extends Controller {
     }
 
     /**
-     * @param   $value
-     * @return  string
+     * Inverte o texto fornecido.
+     * 
+     * @param array $value Array contendo o texto a ser invertido
+     * @return string HTML renderizado com o texto invertido
      */
     private function iaReverseText($value) {
         $data['result'] = strrev($value[1]);
@@ -581,8 +648,16 @@ class Web extends Controller {
     }
 
     /**
-     * @param   $value
-     * @return  string
+     * Converte uma cor hexadecimal para diferentes formatos de cor.
+     * 
+     * Utiliza a biblioteca HexConverter para gerar:
+     * - Valor hexadecimal
+     * - RGB (Red, Green, Blue)
+     * - HSL (Hue, Saturation, Lightness)
+     * - CMYK (Cyan, Magenta, Yellow, Key)
+     * 
+     * @param array $value Array contendo o código hexadecimal da cor
+     * @return string HTML renderizado com as conversões de cor
      */
     private function iaHexColor($value) {
         $hex = new HexConverter($value[1]);
@@ -595,8 +670,10 @@ class Web extends Controller {
     }
 
     /**
-     * @param   $value
-     * @return  string
+     * Gera o hash MD5 do texto fornecido.
+     * 
+     * @param array $value Array contendo o texto para gerar o hash MD5
+     * @return string HTML renderizado com o hash MD5
      */
     private function iaMD5($value) {
         $data['query'] = $value[1];
@@ -606,9 +683,15 @@ class Web extends Controller {
     }
 
     /**
-     * @param   $value
-     * @param   $type
-     * @return  string
+     * Codifica ou decodifica texto em Base64.
+     * 
+     * Validações:
+     * - Para decodificação, verifica se o resultado é válido
+     * - Se a decodificação falhar, retorna false
+     * 
+     * @param array $value Array contendo o texto para codificar/decodificar
+     * @param int $type 1 para codificar, 2 para decodificar
+     * @return string|false HTML renderizado com o resultado ou false se falhar
      */
     private function iaBase64($value, $type) {
         $data['query'] = $value[1];
@@ -619,7 +702,7 @@ class Web extends Controller {
         } else {
             $data['result'] = base64_decode($value[1], true);
 
-            // If the decoded base64 string is not valid
+            // Se a string decodificada em base64 não for válida
             if(empty(htmlspecialchars($data['result']))) {
                 return false;
             }
@@ -629,9 +712,16 @@ class Web extends Controller {
     }
 
     /**
-     * @param   $value
-     * @param   $type
-     * @return  string
+     * Converte o texto para diferentes formatos de case.
+     * 
+     * Tipos suportados:
+     * - 1: Minúsculas (lowercase)
+     * - 2: Maiúsculas (uppercase)
+     * - 3: Camelcase (primeira palavra minúscula, demais com primeira letra maiúscula)
+     * 
+     * @param array $value Array contendo o texto para converter
+     * @param int $type Tipo de conversão (1, 2 ou 3)
+     * @return string HTML renderizado com o texto convertido
      */
     private function iaCase($value, $type) {
         $data['query'] = $value[1];
@@ -658,8 +748,15 @@ class Web extends Controller {
     }
 
     /**
-     * @param   $value
-     * @return  string
+     * Verifica se um ano é bissexto.
+     * 
+     * Processo:
+     * 1. Extrai o ano do array de valores
+     * 2. Usa a função date('L') para verificar se é bissexto
+     * 3. Define o tipo de resposta (1 para bissexto, 2 para não bissexto)
+     * 
+     * @param array $value Array contendo o ano a ser verificado
+     * @return string HTML renderizado com o resultado da verificação
      */
     private function iaLeapYear($value) {
         if(is_numeric($value[2])) {
@@ -668,7 +765,7 @@ class Web extends Controller {
             $data['query'] = $value[4];
         }
 
-        // Check if the date is a leap year
+        // Verifica se a data é um ano bissexto
         if(date('L', strtotime((int)$data['query'].'-01-01'))) {
             $data['type'] = 1;
         } else {
@@ -679,14 +776,18 @@ class Web extends Controller {
     }
 
     /**
-     * @return string
+     * Exibe a resolução da tela do usuário.
+     * 
+     * @return string HTML renderizado com a resolução da tela
      */
     private function iaUserScreenResolution() {
         return $this->view->render(null, 'web/ia/user_screen_resolution');
     }
 
     /**
-     * @return string
+     * Retorna o valor de Pi (π).
+     * 
+     * @return string HTML renderizado com o valor de Pi
      */
     private function iaPi() {
         $data['result'] = pi();
@@ -694,9 +795,15 @@ class Web extends Controller {
     }
 
     /**
-     * @param   $value
-     * @param   $type
-     * @return  string
+     * Codifica ou decodifica texto em Código Morse.
+     * 
+     * Utiliza a biblioteca MorseCode para:
+     * - Codificar texto para Morse (type = 1)
+     * - Decodificar Morse para texto (type = 2)
+     * 
+     * @param array $value Array contendo o texto para codificar/decodificar
+     * @param int $type 1 para codificar, 2 para decodificar
+     * @return string HTML renderizado com o resultado
      */
     private function iaMorseCode($value, $type) {
         $data['query'] = $value[1];
@@ -713,9 +820,15 @@ class Web extends Controller {
     }
 
     /**
-     * @param   $value
-     * @param   $type
-     * @return  string
+     * Converte tempo Unix para data/hora ou retorna o tempo Unix atual.
+     * 
+     * Funcionalidades:
+     * - Converte timestamp Unix para data e hora (type = 1)
+     * - Retorna o timestamp Unix atual (type = 2)
+     * 
+     * @param array $value Array contendo o timestamp Unix
+     * @param int $type 1 para converter, 2 para obter atual
+     * @return string HTML renderizado com o resultado
      */
     private function iaUnixTime($value, $type) {
         $data['type'] = $type;
@@ -731,8 +844,17 @@ class Web extends Controller {
     }
 
     /**
-     * @param   $value
-     * @return  string
+     * Gera texto Lorem Ipsum com o número de parágrafos especificado.
+     * 
+     * Validações:
+     * - Mínimo: 1 parágrafo
+     * - Máximo: 50 parágrafos
+     * - Padrão: 3 parágrafos se não especificado
+     * 
+     * Utiliza a biblioteca LoremIpsum para gerar o texto.
+     * 
+     * @param array $value Array contendo o número de parágrafos desejados
+     * @return string HTML renderizado com o texto Lorem Ipsum
      */
     private function iaLoremIpsum($value) {
         $count = 3;
@@ -755,8 +877,15 @@ class Web extends Controller {
     }
 
     /**
-     * @param   $value
-     * @return  string
+     * Aplica a cifra Atbash ao texto fornecido.
+     * 
+     * A cifra Atbash é uma substituição simples onde:
+     * - A = Z, B = Y, C = X, etc.
+     * - Números permanecem inalterados
+     * - Espaços são adicionados a cada 5 caracteres para melhor legibilidade
+     * 
+     * @param array $value Array contendo o texto para cifrar
+     * @return string HTML renderizado com o texto cifrado
      */
     private function iaAtbashCipher($value) {
         $az = range('a', 'z');
@@ -769,17 +898,17 @@ class Web extends Controller {
         $count = 0;
         foreach(str_split($string) as $char) {
             $count++;
-            // If the character is a digit
+            // Se o caractere for um dígito
             if(is_numeric($char)) {
                 $encoded[] = $char;
             }
 
-            // Get the reversed character
+            // Obtém o caractere invertido
             if(ctype_alpha($char)) {
                 $encoded[] = $za[array_search($char, $az)];
             }
 
-            // Add a space after every 5 characters
+            // Adiciona um espaço a cada 5 caracteres
             if($count % 5 == 0 && $count < $len) {
                 $encoded[] = ' ';
             }
@@ -792,8 +921,15 @@ class Web extends Controller {
     }
 
     /**
-     * @param $value
-     * @return string
+     * Gera um UUID (Universally Unique Identifier) versão 4.
+     * 
+     * O UUID gerado segue o padrão RFC 4122:
+     * - Formato: xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx
+     * - Versão 4 (aleatório)
+     * - Variante 1 (RFC 4122)
+     * 
+     * @param array $value Array de parâmetros (não utilizado)
+     * @return string HTML renderizado com o UUID gerado
      */
     private function iaUUID($value)
     {
@@ -809,16 +945,24 @@ class Web extends Controller {
     }
 
     /**
-     * Return the Filters view or the Filters array
-     *
-     * @param   boolean $type   Return the Filters array if true
-     * @return  string | array
+     * Retorna a view dos filtros de busca ou o array de filtros.
+     * 
+     * Este método gerencia os filtros disponíveis para busca:
+     * - Período (último dia, semana, mês)
+     * - Tipo de arquivo (PDF, DOC, XLS, etc.)
+     * - Busca segura (Off, Moderate, Strict)
+     * 
+     * Estrutura do array de menu:
+     * Array(categoriaTítulo) => Array(parâmetroCategoria), Array(filtrosCategoria), Array(filtroAtual)
+     * 
+     * @param boolean $type Se true, retorna o array de filtros; se false ou null, retorna a view
+     * @return string|array View HTML dos filtros ou array de filtros
      */
     private function searchFilters($type = null) {
         $data['query'] = $_GET['q'];
 
         /**
-         * Array Map: Array(categoryTitle) => Array(categoryParameter), Array(categoryFilters), Array(currentFilter)
+         * Mapa do Array: Array(títuloCategoria) => Array(parâmetroCategoria), Array(filtrosCategoria), Array(filtroAtual)
          */
         $data['menu'] = [
             'period'        => [
@@ -858,11 +1002,11 @@ class Web extends Controller {
             ]
         ];
 
-        // The search filters
+        // Os filtros de busca
         $data['filters'] = ['freshness', 'fileType', 'safeSearch'];
 
         if($type) {
-            // Remove empty fields from the list
+            // Remove campos vazios da lista
             foreach($data['menu'] as $key => $value) {
                 unset($data['menu'][$key][1]['']);
             }

@@ -4,6 +4,9 @@ namespace Fir\Controllers;
 
 use Fir\Libraries\Search;
 
+// Controller responsável pelas preferências do usuário
+// Permite configurar idioma, tema, preferências de busca e exibe menu de preferências
+
 class Preferences extends Controller {
 
     /**

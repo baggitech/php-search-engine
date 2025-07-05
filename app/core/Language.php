@@ -3,7 +3,8 @@
 namespace Fir\Languages;
 
 /**
- * The Language class which gets and set the languages
+ * Classe responsável pelo carregamento e gerenciamento dos arquivos de idioma
+ * Permite obter traduções e textos internacionalizados para o sistema
  */
 class Language {
 
@@ -25,8 +26,24 @@ class Language {
      */
     public $folder;
 
-    public function __construct() {
+    public function __construct($lang = 'english') {
+        // Define o idioma padrão
+        $this->language = $lang;
+        // Carrega o arquivo de idioma correspondente
+        $this->loadLanguageFile();
+    }
+
+    private function loadLanguageFile() {
+        // Monta o caminho do arquivo de idioma
+        $this->folder = __DIR__ .'/../languages/';
+        // Verifica se o arquivo existe
+        if(file_exists($this->folder.$this->language.'.php')) {
+            // Inclui o arquivo de idioma
         $this->languages = $this->languages();
+        } else {
+            // Caso não exista, define o dicionário como vazio
+            $this->languages = [];
+        }
     }
 
     /**
@@ -34,9 +51,6 @@ class Language {
      * @return	array
      */
     private function languages() {
-        // Define the languages folder
-        $this->folder = __DIR__ .'/../languages/';
-
         $languages = [];
 
         if($handle = opendir($this->folder)) {
@@ -53,10 +67,37 @@ class Language {
     }
 
     /**
+     * Retorna o idioma atualmente selecionado
      * @return string
      */
     public function get() {
         return $this->language;
+    }
+
+    /**
+     * Retorna a tradução correspondente à chave, ou a própria chave caso não exista
+     * @param string $key
+     * @return string
+     */
+    public function traduzir($key) {
+        // Garante que o dicionário de idioma está carregado
+        if (!isset($this->dictionary)) {
+            $this->carregarDicionario();
+        }
+        // Retorna a tradução ou a própria chave se não existir
+        return isset($this->dictionary[$key]) ? $this->dictionary[$key] : $key;
+    }
+
+    /**
+     * Carrega o dicionário de traduções do idioma selecionado
+     */
+    private function carregarDicionario() {
+        $arquivo = $this->folder . $this->language . '.php';
+        if (file_exists($arquivo)) {
+            $this->dictionary = include($arquivo);
+        } else {
+            $this->dictionary = [];
+        }
     }
 
     /**

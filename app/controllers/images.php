@@ -4,6 +4,9 @@ namespace Fir\Controllers;
 
 use Fir\Libraries\Search;
 
+// Controller responsável pela busca de imagens
+// Processa requisições de busca, aplica filtros, paginação e exibe resultados de imagens
+
 class Images extends Controller {
 
     /**

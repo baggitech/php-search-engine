@@ -4,6 +4,9 @@ namespace Fir\Controllers;
 
 use Fir\Libraries\Search;
 
+// Controller responsável pela busca de notícias
+// Processa requisições de busca, aplica filtros, paginação e exibe resultados de notícias
+
 class News extends Controller {
 
     /**

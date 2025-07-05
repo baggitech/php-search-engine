@@ -2,6 +2,9 @@
 
 namespace Fir\Controllers;
 
+// Controller responsável pela página inicial do sistema
+// Exibe a home com informações gerais e campo de busca
+
 class Home extends Controller {
 
     /**

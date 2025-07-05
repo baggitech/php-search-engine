@@ -3,13 +3,15 @@
 namespace Fir\Middleware;
 
 /**
- * Class Authorize takes care of site routing based on user status
+ * Classe Authorize cuida do roteamento do site com base no status do usuário
  */
 class Authorize {
 
     /**
-     * @var array   The list of routes to be blocked from being accessed by Users
-     *              Array Map: Key(User Role) => Array(Routes Maps) => (Array(Routes), Array(Redirect))
+     * Lista de rotas a serem bloqueadas para determinados perfis de usuário
+     * Mapa: Chave (perfil) => Array(Mapas de Rotas) => (Array(Rotas), Array(Redirecionamento))
+     * Exemplo: 'guest' não pode acessar rotas administrativas, 'admin' não pode acessar login admin
+     * @var array
      */
     protected $except = [
         'guest' => [
@@ -20,26 +22,31 @@ class Authorize {
         ]
     ];
 
+    /**
+     * Construtor: verifica o perfil do usuário e redireciona caso tente acessar rota bloqueada
+     */
     public function __construct() {
-        // Select the route maps based on the user role
+        // Seleciona o perfil do usuário com base na sessão
         if(isset($_SESSION['isAdmin'])) {
             $user = 'admin';
         } else {
             $user = 'guest';
         }
 
+        // Para cada grupo de rotas bloqueadas para o perfil
         foreach($this->except[$user] as $routes) {
+            // Para cada rota bloqueada
             foreach($routes[0] as $route) {
-                // If the route has match anything rule (*)
+                // Se a rota termina com * (coringa)
                 if(substr($route, -1) == '*') {
-                    // If the current path matches a route exception
+                    // Se a URL atual começa com o prefixo da rota bloqueada
                     if(isset($_GET['url']) && stripos($_GET['url'], str_replace('*', '', $route)) === 0) {
-                        redirect($routes[1][0]);
+                        redirect($routes[1][0]); // Redireciona para rota permitida
                     }
                 }
-                // If the current path matches a route exception
+                // Se a URL atual corresponde exatamente a uma rota bloqueada
                 elseif(isset($_GET['url']) && in_array($_GET['url'], $routes[0])) {
-                    redirect($routes[1][0]);
+                    redirect($routes[1][0]); // Redireciona para rota permitida
                 }
             }
         }
